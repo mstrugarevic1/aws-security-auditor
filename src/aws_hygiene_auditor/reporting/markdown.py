@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from aws_hygiene_auditor.models import ScanReport, Severity
+from aws_hygiene_auditor.reporting.regions import region_label
 
 
 def render_markdown(report: ScanReport) -> str:
@@ -16,7 +17,8 @@ def render_markdown(report: ScanReport) -> str:
     ]
     for f in report.findings:
         lines.append(
-            f"| {f.severity.value} | {f.region} | {f.service} | {f.resource_id} | {f.title} |"
+            f"| {f.severity.value} | {region_label(f.region)} | {f.service} | "
+            f"{f.resource_id} | {f.title} |"
         )
     counts = {s: sum(1 for f in report.findings if f.severity == s) for s in Severity}
     lines.extend(

@@ -32,4 +32,5 @@ def test_json_output_has_no_ansi() -> None:
 def test_markdown_output() -> None:
     text = render_markdown(_report())
     assert "| Severity | Region | Service | Resource | Finding |" in text
+    assert "us-east-1 (US East (N. Virginia))" in text
     assert "## Summary" in text

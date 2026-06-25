@@ -6,7 +6,7 @@
 
 | Severity | Region | Service | Resource | Finding |
 | --- | --- | --- | --- | --- |
-| HIGH | eu-central-1 | EC2 | sg-012345 | SSH open to the world |
+| HIGH | eu-central-1 (Europe (Frankfurt)) | EC2 | sg-012345 | SSH open to the world |
 
 ## Summary
 
@@ -18,4 +18,3 @@
 - LOW: 0
 - Errors: 0
 - Duration: 3.2s
-

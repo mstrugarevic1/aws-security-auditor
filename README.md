@@ -105,9 +105,9 @@ Implemented checks:
 ## Example Output
 
 ```text
-HIGH    eu-central-1  EC2  sg-012345   SSH open to the world
-MEDIUM  eu-west-1     EBS  vol-012345  Unattached EBS volume
-LOW     us-east-1     EC2  i-012345    Missing required tags
+HIGH    eu-central-1 (Europe (Frankfurt))  EC2  sg-012345   SSH open to the world
+MEDIUM  eu-west-1 (Europe (Ireland))       EBS  vol-012345  Unattached EBS volume
+LOW     us-east-1 (US East (N. Virginia))  EC2  i-012345    Missing required tags
 
 Scanned regions: 18
 Checks executed: 12
@@ -146,4 +146,3 @@ pytest
 ```
 
 CI runs those commands without AWS credentials and without integration tests against a real account.
-

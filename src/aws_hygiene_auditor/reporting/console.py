@@ -6,6 +6,7 @@ from rich.console import Console
 from rich.table import Table
 
 from aws_hygiene_auditor.models import ScanReport, Severity
+from aws_hygiene_auditor.reporting.regions import region_label
 
 STYLES = {Severity.HIGH: "bold red", Severity.MEDIUM: "bold yellow", Severity.LOW: "bold cyan"}
 
@@ -26,7 +27,7 @@ def render_console(report: ScanReport, no_color: bool = False) -> None:
     for f in report.findings:
         table.add_row(
             f.severity.value,
-            f.region,
+            region_label(f.region),
             f.service,
             f.resource_id,
             f.title,
@@ -44,4 +45,4 @@ def render_console(report: ScanReport, no_color: bool = False) -> None:
     console.print(f"Errors: {report.summary.errors}")
     console.print(f"Duration: {report.summary.duration_seconds}s")
     for error in report.errors:
-        console.print(f"WARNING {error.region} {error.message}", style="yellow")
+        console.print(f"WARNING {region_label(error.region)} {error.message}", style="yellow")
