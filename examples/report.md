@@ -1,7 +1,7 @@
-# AWS Hygiene Auditor Report
+# AWS Security Auditor Report
 
 - Account: `123456789012`
-- ARN: `arn:aws:iam::123456789012:role/AwsHygieneAuditorReadOnly`
+- ARN: `arn:aws:iam::123456789012:role/AwsSecurityAuditorReadOnly`
 - Regions scanned: 2
 
 | Severity | Region | Service | Resource | Finding |

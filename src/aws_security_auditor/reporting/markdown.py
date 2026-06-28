@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from aws_hygiene_auditor.models import ScanReport, Severity
-from aws_hygiene_auditor.reporting.regions import region_label
+from aws_security_auditor.models import ScanReport, Severity
+from aws_security_auditor.reporting.regions import region_label
 
 
 def render_markdown(report: ScanReport) -> str:
     lines = [
-        "# AWS Hygiene Auditor Report",
+        "# AWS Security Auditor Report",
         "",
         f"- Account: `{report.account_id}`",
         f"- ARN: `{report.arn}`",

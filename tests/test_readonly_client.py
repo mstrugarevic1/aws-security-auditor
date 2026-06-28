@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from aws_hygiene_auditor.readonly_client import (
+from aws_security_auditor.readonly_client import (
     ALLOWED_OPERATIONS,
     ReadOnlyAwsClient,
     UnsafeAwsOperationError,

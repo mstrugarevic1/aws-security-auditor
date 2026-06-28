@@ -4,15 +4,44 @@ from datetime import UTC, datetime, timedelta
 
 from botocore.exceptions import BotoCoreError, ClientError
 
-from aws_hygiene_auditor.checks.base import CheckResult
-from aws_hygiene_auditor.models import Finding, ScanError, Severity
-from aws_hygiene_auditor.readonly_client import ReadOnlyAwsClient
+from aws_security_auditor.checks.base import CheckResult
+from aws_security_auditor.models import Finding, ScanError, Severity
+from aws_security_auditor.readonly_client import ReadOnlyAwsClient
 
 
 def scan_iam(iam: ReadOnlyAwsClient, access_key_age_days: int) -> CheckResult:
-    result = CheckResult(checks=4)
+    result = CheckResult(checks=6)
     cutoff = datetime.now(UTC) - timedelta(days=access_key_age_days)
     try:
+        summary = iam.call("get_account_summary").get("SummaryMap", {})
+        if summary.get("AccountMFAEnabled") != 1:
+            result.findings.append(
+                Finding(
+                    Severity.HIGH,
+                    "IAM_ROOT_MFA_DISABLED",
+                    "IAM",
+                    "global",
+                    "root",
+                    "Root account MFA is not enabled",
+                    "The AWS account root user does not have MFA enabled.",
+                    "Enable MFA for the root user.",
+                )
+            )
+        if summary.get("AccountAccessKeysPresent", 0) > 0:
+            result.findings.append(
+                Finding(
+                    Severity.HIGH,
+                    "IAM_ROOT_ACCESS_KEYS_PRESENT",
+                    "IAM",
+                    "global",
+                    "root",
+                    "Root account access keys exist",
+                    "The AWS account root user has access keys.",
+                    "Delete root access keys and use IAM roles or users instead.",
+                )
+            )
+        _password_policy_findings(iam, result)
+
         for page in iam.paginate("list_users"):
             users = page.get("Users", [])
             result.resources += len(users)
@@ -113,6 +142,48 @@ def scan_iam(iam: ReadOnlyAwsClient, access_key_age_days: int) -> CheckResult:
     except (ClientError, BotoCoreError, KeyError, TypeError) as exc:
         return CheckResult(errors=[ScanError("IAM", "global", f"IAM scan skipped: {exc}")])
     return result
+
+
+def _password_policy_findings(iam: ReadOnlyAwsClient, result: CheckResult) -> None:
+    try:
+        policy = iam.call("get_account_password_policy").get("PasswordPolicy", {})
+    except ClientError as exc:
+        if exc.response.get("Error", {}).get("Code") == "NoSuchEntity":
+            result.findings.append(
+                Finding(
+                    Severity.MEDIUM,
+                    "IAM_PASSWORD_POLICY_MISSING",
+                    "IAM",
+                    "global",
+                    "account",
+                    "IAM account password policy is missing",
+                    "No IAM password policy is configured.",
+                    "Configure a strong IAM account password policy.",
+                )
+            )
+            return
+        raise
+    minimum_length = int(policy.get("MinimumPasswordLength", 0))
+    if (
+        minimum_length < 14
+        or policy.get("RequireSymbols") is not True
+        or policy.get("RequireNumbers") is not True
+        or policy.get("RequireUppercaseCharacters") is not True
+        or policy.get("RequireLowercaseCharacters") is not True
+    ):
+        result.findings.append(
+            Finding(
+                Severity.MEDIUM,
+                "IAM_WEAK_PASSWORD_POLICY",
+                "IAM",
+                "global",
+                "account",
+                "IAM password policy is weak",
+                "Password policy does not require length >= 14 plus symbols, numbers, "
+                "uppercase, and lowercase characters.",
+                "Strengthen the IAM account password policy.",
+            )
+        )
 
 
 def _has_console_login(iam: ReadOnlyAwsClient, user_name: str) -> bool:

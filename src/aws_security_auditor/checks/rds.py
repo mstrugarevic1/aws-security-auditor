@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from botocore.exceptions import BotoCoreError, ClientError
 
-from aws_hygiene_auditor.checks.base import CheckResult
-from aws_hygiene_auditor.models import Finding, ScanError, Severity
-from aws_hygiene_auditor.readonly_client import ReadOnlyAwsClient
+from aws_security_auditor.checks.base import CheckResult
+from aws_security_auditor.models import Finding, ScanError, Severity
+from aws_security_auditor.readonly_client import ReadOnlyAwsClient
 
 
 def scan_rds(rds: ReadOnlyAwsClient, region: str) -> CheckResult:

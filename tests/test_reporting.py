@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from aws_hygiene_auditor.models import Finding, ScanReport, ScanSummary, Severity, sort_findings
-from aws_hygiene_auditor.reporting.json_report import render_json
-from aws_hygiene_auditor.reporting.markdown import render_markdown
+from aws_security_auditor.models import Finding, ScanReport, ScanSummary, Severity, sort_findings
+from aws_security_auditor.reporting.json_report import render_json
+from aws_security_auditor.reporting.markdown import render_markdown
 
 
 def _report() -> ScanReport:

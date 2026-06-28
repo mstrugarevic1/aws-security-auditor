@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from aws_hygiene_auditor import regions
+from aws_security_auditor import regions
 
 
 class FakeEc2:

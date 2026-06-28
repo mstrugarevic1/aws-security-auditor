@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 
 from botocore.exceptions import ClientError
 
-from aws_hygiene_auditor.checks.iam import scan_iam
+from aws_security_auditor.checks.iam import scan_iam
 
 
 class FakeIam:
@@ -31,6 +31,10 @@ class FakeIam:
         raise AssertionError(operation)
 
     def call(self, operation: str, **kwargs: object) -> dict[str, object]:
+        if operation == "get_account_summary":
+            return {"SummaryMap": {"AccountMFAEnabled": 0, "AccountAccessKeysPresent": 1}}
+        if operation == "get_account_password_policy":
+            return {"PasswordPolicy": {"MinimumPasswordLength": 8}}
         if operation == "get_login_profile":
             return {"LoginProfile": {}}
         if operation == "get_access_key_last_used":
@@ -43,3 +47,8 @@ def test_old_access_key_and_missing_mfa() -> None:
     assert {"IAM_OLD_ACCESS_KEY", "IAM_UNUSED_ACCESS_KEY", "IAM_USER_NO_MFA"} <= {
         f.check_id for f in result.findings
     }
+    assert {
+        "IAM_ROOT_MFA_DISABLED",
+        "IAM_ROOT_ACCESS_KEYS_PRESENT",
+        "IAM_WEAK_PASSWORD_POLICY",
+    } <= {f.check_id for f in result.findings}

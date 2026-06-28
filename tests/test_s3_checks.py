@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from botocore.exceptions import ClientError
 
-from aws_hygiene_auditor.checks import s3 as s3_checks
-from aws_hygiene_auditor.checks.s3 import bucket_region, scan_s3
+from aws_security_auditor.checks import s3 as s3_checks
+from aws_security_auditor.checks.s3 import bucket_region, scan_s3
 
 
 class FakeS3:

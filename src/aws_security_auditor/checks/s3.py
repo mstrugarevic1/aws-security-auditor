@@ -5,10 +5,10 @@ from typing import Any
 
 from botocore.exceptions import BotoCoreError, ClientError
 
-from aws_hygiene_auditor.auth import client
-from aws_hygiene_auditor.checks.base import CheckResult
-from aws_hygiene_auditor.models import Finding, ScanError, Severity
-from aws_hygiene_auditor.readonly_client import ReadOnlyAwsClient
+from aws_security_auditor.auth import client
+from aws_security_auditor.checks.base import CheckResult
+from aws_security_auditor.models import Finding, ScanError, Severity
+from aws_security_auditor.readonly_client import ReadOnlyAwsClient
 
 
 def bucket_region(s3: ReadOnlyAwsClient, bucket: str) -> str:
@@ -48,8 +48,8 @@ def _account_public_block_disabled(s3control: ReadOnlyAwsClient, account_id: str
         cfg = s3control.call("get_public_access_block", AccountId=account_id).get(
             "PublicAccessBlockConfiguration", {}
         )
-    except ClientError:
-        return True
+    except ClientError as exc:
+        return _error_code(exc) in {"NoSuchPublicAccessBlockConfiguration", "NoSuchConfiguration"}
     return not all(
         cfg.get(k) is True
         for k in (
@@ -158,8 +158,8 @@ def _bucket_public_block_disabled(s3: ReadOnlyAwsClient, bucket: str) -> bool:
         cfg = s3.call("get_bucket_public_access_block", Bucket=bucket).get(
             "PublicAccessBlockConfiguration", {}
         )
-    except ClientError:
-        return True
+    except ClientError as exc:
+        return _error_code(exc) in {"NoSuchPublicAccessBlockConfiguration", "NoSuchConfiguration"}
     return not all(
         cfg.get(k) is True
         for k in (
@@ -174,6 +174,13 @@ def _bucket_public_block_disabled(s3: ReadOnlyAwsClient, bucket: str) -> bool:
 def _missing(s3: ReadOnlyAwsClient, bucket: str, operation: str) -> bool:
     try:
         s3.call(operation, Bucket=bucket)
-    except ClientError:
-        return True
+    except ClientError as exc:
+        return _error_code(exc) in {
+            "NoSuchPublicAccessBlockConfiguration",
+            "ServerSideEncryptionConfigurationNotFoundError",
+        }
     return False
+
+
+def _error_code(exc: ClientError) -> str:
+    return str(exc.response.get("Error", {}).get("Code", ""))

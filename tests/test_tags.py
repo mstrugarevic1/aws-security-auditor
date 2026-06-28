@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from aws_hygiene_auditor.checks.tags import missing_tag_findings
+from aws_security_auditor.checks.tags import missing_tag_findings
 
 
 def test_missing_required_tags() -> None:
