@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/mstrugarevic1/aws-hygiene-auditor/actions/workflows/test.yml"><img alt="Tests" src="https://github.com/mstrugarevic1/aws-hygiene-auditor/actions/workflows/test.yml/badge.svg"></a>
+  <a href="https://github.com/mstrugarevic1/aws-security-auditor/actions/workflows/test.yml"><img alt="Tests" src="https://github.com/mstrugarevic1/aws-security-auditor/actions/workflows/test.yml/badge.svg"></a>
   <img alt="Python 3.11+" src="https://img.shields.io/badge/python-3.11%2B-blue">
   <img alt="pytest" src="https://img.shields.io/badge/tests-pytest-green">
   <img alt="License MIT" src="https://img.shields.io/badge/license-MIT-green">
@@ -134,19 +134,32 @@ Implemented checks:
 ## Example Output
 
 ```text
-HIGH    eu-central-1 (Europe (Frankfurt))  EC2  sg-012345   SSH open to the world
-MEDIUM  eu-west-1 (Europe (Ireland))       EBS  vol-012345  Unattached EBS volume
-LOW     us-east-1 (US East (N. Virginia))  EC2  i-012345    Missing required tags
+HIGH    global                             IAM        root        Root account MFA is not enabled
+HIGH    eu-central-1 (Europe (Frankfurt))  EC2        sg-012345   SSH open to the world
+HIGH    us-east-1 (US East (N. Virginia))  EBS        snap-012345 Public EBS snapshot
+HIGH    us-east-1 (US East (N. Virginia))  EC2        ami-012345  Public account-owned AMI
+MEDIUM  us-east-1 (US East (N. Virginia))  CloudTrail account     No multi-region CloudTrail trail found
+MEDIUM  eu-west-1 (Europe (Ireland))       Config     account     AWS Config recorder is not configured
+MEDIUM  eu-west-1 (Europe (Ireland))       GuardDuty  account     GuardDuty is not enabled
+MEDIUM  us-east-1 (US East (N. Virginia))  SecurityHub account     Security Hub is not enabled
+MEDIUM  eu-west-1 (Europe (Ireland))       ELBv2      app-lb      Internet-facing load balancer
+MEDIUM  eu-west-1 (Europe (Ireland))       EBS        vol-012345  Unattached EBS volume
+LOW     us-east-1 (US East (N. Virginia))  ECR        app         ECR scan on push is disabled
+LOW     us-east-1 (US East (N. Virginia))  KMS        key-012345  KMS key rotation is disabled
+LOW     us-east-1 (US East (N. Virginia))  EC2        i-012345    Missing required tags
 
 Scanned regions: 18
-Checks executed: 12
-Resources inspected: 247
-HIGH: 2
-MEDIUM: 7
-LOW: 14
+Checks executed: 28
+Resources inspected: 413
+HIGH: 4
+MEDIUM: 6
+LOW: 3
 Errors: 1
 Duration: 12.4s
 ```
+
+With `--fail-on HIGH`, the report is still rendered, but the command exits with status `1`
+when at least one `HIGH` finding is present.
 
 JSON and Markdown reports contain no ANSI color codes.
 
