@@ -5,8 +5,8 @@ import sys
 from rich.console import Console
 from rich.table import Table
 
-from aws_hygiene_auditor.models import ScanReport, Severity
-from aws_hygiene_auditor.reporting.regions import region_label
+from aws_security_auditor.models import ScanReport, Severity
+from aws_security_auditor.reporting.regions import region_label
 
 STYLES = {Severity.HIGH: "bold red", Severity.MEDIUM: "bold yellow", Severity.LOW: "bold cyan"}
 

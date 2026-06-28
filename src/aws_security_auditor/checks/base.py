@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from aws_hygiene_auditor.models import Finding, ScanError
+from aws_security_auditor.models import Finding, ScanError
 
 
 @dataclass

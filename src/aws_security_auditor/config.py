@@ -16,6 +16,7 @@ class ScanConfig:
     output: str = "table"
     output_file: str | None = None
     severity: str | None = None
+    fail_on: str | None = None
     no_color: bool = False
     verbose: bool = False
     snapshot_age_days: int = 90

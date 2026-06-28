@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import asdict
 
-from aws_hygiene_auditor.models import ScanReport
+from aws_security_auditor.models import ScanReport
 
 
 def render_json(report: ScanReport) -> str:

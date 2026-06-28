@@ -5,8 +5,8 @@ from typing import Any
 import boto3
 from botocore.credentials import ReadOnlyCredentials
 
-from aws_hygiene_auditor.config import AWS_CONFIG, ScanConfig
-from aws_hygiene_auditor.readonly_client import ReadOnlyAwsClient
+from aws_security_auditor.config import AWS_CONFIG, ScanConfig
+from aws_security_auditor.readonly_client import ReadOnlyAwsClient
 
 
 def build_session(config: ScanConfig) -> boto3.Session:
@@ -17,7 +17,7 @@ def build_session(config: ScanConfig) -> boto3.Session:
     sts = ReadOnlyAwsClient("sts", session.client("sts", config=AWS_CONFIG))
     params: dict[str, Any] = {
         "RoleArn": config.role_arn,
-        "RoleSessionName": "aws-hygiene-auditor",
+        "RoleSessionName": "aws-security-auditor",
     }
     if config.external_id:
         params["ExternalId"] = config.external_id

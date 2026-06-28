@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import boto3
 
-from aws_hygiene_auditor.auth import client
+from aws_security_auditor.auth import client
 
 ENABLED_STATUSES = {"opt-in-not-required", "opted-in"}
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from aws_hygiene_auditor.checks.rds import scan_rds
+from aws_security_auditor.checks.rds import scan_rds
 
 
 class FakeRds:

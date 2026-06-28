@@ -1,23 +1,23 @@
 from __future__ import annotations
 
-from aws_hygiene_auditor.checks.base import CheckResult
-from aws_hygiene_auditor.config import ScanConfig
-from aws_hygiene_auditor.scanner import run_scan
+from aws_security_auditor.checks.base import CheckResult
+from aws_security_auditor.config import ScanConfig
+from aws_security_auditor.scanner import run_scan
 
 
 def test_scanning_continues_after_one_regional_error(monkeypatch) -> None:
-    monkeypatch.setattr("aws_hygiene_auditor.scanner.build_session", lambda config: object())
+    monkeypatch.setattr("aws_security_auditor.scanner.build_session", lambda config: object())
     monkeypatch.setattr(
-        "aws_hygiene_auditor.scanner.client",
+        "aws_security_auditor.scanner.client",
         lambda *_args: type(
             "C", (), {"call": lambda self, op, **kw: {"Account": "1", "Arn": "arn"}}
         )(),
     )
     monkeypatch.setattr(
-        "aws_hygiene_auditor.scanner.discover_regions", lambda *_args: (["a", "b"], [])
+        "aws_security_auditor.scanner.discover_regions", lambda *_args: (["a", "b"], [])
     )
-    monkeypatch.setattr("aws_hygiene_auditor.scanner.scan_s3", lambda *_args: CheckResult())
-    monkeypatch.setattr("aws_hygiene_auditor.scanner.scan_iam", lambda *_args: CheckResult())
+    monkeypatch.setattr("aws_security_auditor.scanner.scan_s3", lambda *_args: CheckResult())
+    monkeypatch.setattr("aws_security_auditor.scanner.scan_iam", lambda *_args: CheckResult())
 
     def fake_region(
         session: object, region: str, account_id: str, config: ScanConfig
@@ -26,7 +26,7 @@ def test_scanning_continues_after_one_regional_error(monkeypatch) -> None:
             raise RuntimeError("boom")
         return CheckResult()
 
-    monkeypatch.setattr("aws_hygiene_auditor.scanner._scan_region", fake_region)
+    monkeypatch.setattr("aws_security_auditor.scanner._scan_region", fake_region)
     report = run_scan(ScanConfig(max_workers=1))
     assert report.summary.scanned_regions == 2
     assert report.summary.errors == 1

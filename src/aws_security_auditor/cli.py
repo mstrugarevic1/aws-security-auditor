@@ -6,18 +6,19 @@ from typing import Annotated
 
 import typer
 
-from aws_hygiene_auditor.config import DEFAULT_REQUIRED_TAGS, ScanConfig
-from aws_hygiene_auditor.reporting.console import render_console
-from aws_hygiene_auditor.reporting.json_report import render_json
-from aws_hygiene_auditor.reporting.markdown import render_markdown
-from aws_hygiene_auditor.scanner import run_scan
+from aws_security_auditor.config import DEFAULT_REQUIRED_TAGS, ScanConfig
+from aws_security_auditor.models import SEVERITY_ORDER, Severity
+from aws_security_auditor.reporting.console import render_console
+from aws_security_auditor.reporting.json_report import render_json
+from aws_security_auditor.reporting.markdown import render_markdown
+from aws_security_auditor.scanner import run_scan
 
-app = typer.Typer(help="Read-only AWS hygiene auditor.")
+app = typer.Typer(help="Read-only AWS security auditor.")
 
 
 @app.callback()
 def main() -> None:
-    """Read-only AWS hygiene auditor."""
+    """Read-only AWS security auditor."""
 
 
 @app.command()
@@ -30,6 +31,10 @@ def scan(
     output_file: Annotated[Path | None, typer.Option(help="Write report to this path.")] = None,
     severity: Annotated[
         str | None, typer.Option(help="Only include HIGH, MEDIUM, or LOW findings.")
+    ] = None,
+    fail_on: Annotated[
+        str | None,
+        typer.Option(help="Exit with status 1 when findings include this severity or higher."),
     ] = None,
     no_color: Annotated[bool, typer.Option(help="Disable terminal color.")] = False,
     verbose: Annotated[bool, typer.Option(help="Show skipped regions and warnings.")] = False,
@@ -56,6 +61,7 @@ def scan(
         output=output,
         output_file=str(output_file) if output_file else None,
         severity=severity,
+        fail_on=fail_on,
         no_color=no_color,
         verbose=verbose,
         snapshot_age_days=snapshot_age_days,
@@ -78,3 +84,8 @@ def scan(
 
     if output_file:
         output_file.write_text(text, encoding="utf-8")
+
+    if fail_on:
+        threshold = Severity(fail_on)
+        if any(SEVERITY_ORDER[f.severity] <= SEVERITY_ORDER[threshold] for f in report.findings):
+            raise typer.Exit(1)

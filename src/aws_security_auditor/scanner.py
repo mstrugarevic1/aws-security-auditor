@@ -6,16 +6,23 @@ from dataclasses import replace
 
 from botocore.exceptions import BotoCoreError, ClientError
 
-from aws_hygiene_auditor.auth import build_session, client
-from aws_hygiene_auditor.checks.base import CheckResult
-from aws_hygiene_auditor.checks.ec2 import scan_ec2
-from aws_hygiene_auditor.checks.iam import scan_iam
-from aws_hygiene_auditor.checks.rds import scan_rds
-from aws_hygiene_auditor.checks.s3 import scan_s3
-from aws_hygiene_auditor.checks.tags import scan_regional_tags
-from aws_hygiene_auditor.config import ScanConfig
-from aws_hygiene_auditor.models import ScanError, ScanReport, ScanSummary, Severity, sort_findings
-from aws_hygiene_auditor.regions import discover_regions
+from aws_security_auditor.auth import build_session, client
+from aws_security_auditor.checks.account import (
+    scan_cloudtrail,
+    scan_config,
+    scan_guardduty,
+    scan_securityhub,
+)
+from aws_security_auditor.checks.base import CheckResult
+from aws_security_auditor.checks.ec2 import scan_ec2
+from aws_security_auditor.checks.iam import scan_iam
+from aws_security_auditor.checks.network import scan_ecr, scan_elbv2, scan_kms
+from aws_security_auditor.checks.rds import scan_rds
+from aws_security_auditor.checks.s3 import scan_s3
+from aws_security_auditor.checks.tags import scan_regional_tags
+from aws_security_auditor.config import ScanConfig
+from aws_security_auditor.models import ScanError, ScanReport, ScanSummary, Severity, sort_findings
+from aws_security_auditor.regions import discover_regions
 
 
 def run_scan(config: ScanConfig) -> ScanReport:
@@ -77,7 +84,14 @@ def _scan_region(session: object, region: str, account_id: str, config: ScanConf
     rds = client(session, "rds", region)
     combined = CheckResult()
     for result in (
+        scan_cloudtrail(client(session, "cloudtrail", region), region),
+        scan_config(client(session, "config", region), region),
+        scan_guardduty(client(session, "guardduty", region), region),
+        scan_securityhub(client(session, "securityhub", region), region),
         scan_ec2(ec2, region, account_id, config.snapshot_age_days),
+        scan_elbv2(client(session, "elasticloadbalancingv2", region), region),
+        scan_ecr(client(session, "ecr", region), region),
+        scan_kms(client(session, "kms", region), region),
         scan_rds(rds, region),
         scan_regional_tags(ec2, rds, region, config.required_tags),
     ):
