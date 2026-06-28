@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import sys
 
+from rich import box
 from rich.console import Console
 from rich.table import Table
+from rich.text import Text
 
 from aws_security_auditor.models import ScanReport, Severity
 from aws_security_auditor.reporting.regions import region_label
@@ -21,17 +23,19 @@ def render_console(report: ScanReport, no_color: bool = False) -> None:
         console.print(f"Assumed role: {report.assumed_role}")
     console.print(f"Regions scanned: {len(report.regions)}")
 
-    table = Table()
-    for column in ("Severity", "Region", "Service", "Resource", "Finding"):
-        table.add_column(column)
+    table = Table(box=box.ASCII, show_lines=False)
+    table.add_column("Severity", width=8)
+    table.add_column("Region", min_width=16)
+    table.add_column("Service", width=10)
+    table.add_column("Resource", overflow="fold")
+    table.add_column("Finding", ratio=2)
     for f in report.findings:
         table.add_row(
-            f.severity.value,
+            Text(f.severity.value, style=STYLES[f.severity]),
             region_label(f.region),
             f.service,
             f.resource_id,
             f.title,
-            style=STYLES[f.severity],
         )
     console.print(table)
 
