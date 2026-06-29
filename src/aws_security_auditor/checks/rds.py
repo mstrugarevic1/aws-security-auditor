@@ -7,14 +7,19 @@ from aws_security_auditor.models import Finding, ScanError, Severity
 from aws_security_auditor.readonly_client import ReadOnlyAwsClient
 
 
-def scan_rds(rds: ReadOnlyAwsClient, region: str) -> CheckResult:
-    result = CheckResult(checks=4)
+def scan_rds(
+    rds: ReadOnlyAwsClient,
+    region: str,
+    critical_resource_tags: dict[str, tuple[str, ...]] | None = None,
+) -> CheckResult:
+    result = CheckResult(checks=5)
     try:
         for page in rds.paginate("describe_db_instances"):
             instances = page.get("DBInstances", [])
             result.resources += len(instances)
             for db in instances:
                 dbid = db.get("DBInstanceIdentifier", "unknown")
+                critical = _is_critical(rds, db, critical_resource_tags or {})
                 if db.get("PubliclyAccessible"):
                     result.findings.append(
                         Finding(
@@ -45,7 +50,7 @@ def scan_rds(rds: ReadOnlyAwsClient, region: str) -> CheckResult:
                 if retention == 0:
                     result.findings.append(
                         Finding(
-                            Severity.MEDIUM,
+                            Severity.HIGH if critical else Severity.MEDIUM,
                             "RDS_BACKUPS_DISABLED",
                             "RDS",
                             region,
@@ -68,6 +73,45 @@ def scan_rds(rds: ReadOnlyAwsClient, region: str) -> CheckResult:
                             "Set backup retention to at least seven days where practical.",
                         )
                     )
+                if db.get("DeletionProtection") is False:
+                    result.findings.append(
+                        Finding(
+                            Severity.HIGH if critical else Severity.MEDIUM,
+                            "RDS_DELETION_PROTECTION_DISABLED",
+                            "RDS",
+                            region,
+                            dbid,
+                            "RDS deletion protection disabled",
+                            "RDS instance can be deleted without deletion protection.",
+                            "Enable deletion protection where accidental deletion would be risky.",
+                        )
+                    )
     except (ClientError, BotoCoreError, KeyError, TypeError, ValueError) as exc:
         return CheckResult(errors=[ScanError("RDS", region, f"RDS scan skipped: {exc}")])
     return result
+
+
+def _is_critical(
+    rds: ReadOnlyAwsClient,
+    db: dict[str, object],
+    critical_resource_tags: dict[str, tuple[str, ...]],
+) -> bool:
+    arn = db.get("DBInstanceArn")
+    if not arn or not critical_resource_tags:
+        return False
+    try:
+        tags = rds.call("list_tags_for_resource", ResourceName=arn).get("TagList", [])
+    except (ClientError, BotoCoreError, KeyError, TypeError):
+        return False
+    configured = {
+        key.lower(): {value.lower() for value in values}
+        for key, values in critical_resource_tags.items()
+    }
+    for tag in tags:
+        if not isinstance(tag, dict):
+            continue
+        key = str(tag.get("Key", "")).lower()
+        value = str(tag.get("Value", "")).lower()
+        if value in configured.get(key, set()):
+            return True
+    return False
