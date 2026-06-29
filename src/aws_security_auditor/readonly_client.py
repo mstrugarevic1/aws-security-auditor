@@ -9,6 +9,7 @@ ALLOWED_OPERATIONS = {
         "describe_addresses",
         "describe_images",
         "describe_instances",
+        "describe_network_interfaces",
         "describe_regions",
         "describe_snapshot_attribute",
         "describe_security_groups",
@@ -23,7 +24,7 @@ ALLOWED_OPERATIONS = {
     "elbv2": {"describe_load_balancers"},
     "ecr": {"describe_repositories"},
     "kms": {"get_key_rotation_status", "list_keys"},
-    "rds": {"describe_db_instances"},
+    "rds": {"describe_db_instances", "list_tags_for_resource"},
     "s3": {
         "get_bucket_acl",
         "get_bucket_encryption",
@@ -39,6 +40,7 @@ ALLOWED_OPERATIONS = {
     "iam": {
         "get_access_key_last_used",
         "get_account_password_policy",
+        "get_account_authorization_details",
         "get_account_summary",
         "get_login_profile",
         "list_access_keys",

@@ -90,6 +90,28 @@ class FakeEc2:
                     ]
                 }
             ],
+            "describe_network_interfaces": [
+                {
+                    "NetworkInterfaces": [
+                        {"Groups": [{"GroupId": "sg-1"}]},
+                    ]
+                }
+            ],
+            "describe_instances": [
+                {
+                    "Reservations": [
+                        {
+                            "Instances": [
+                                {
+                                    "InstanceId": "i-1",
+                                    "PublicIpAddress": "203.0.113.10",
+                                    "SecurityGroups": [{"GroupId": "sg-2"}],
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ],
             "describe_snapshots": [{"Snapshots": [old_snapshot]}],
             "describe_images": [{"Images": [{"ImageId": "ami-1", "Public": True}]}],
         }
@@ -105,6 +127,8 @@ def test_ec2_findings() -> None:
         "EC2_SG_OPEN_HTTP",
         "EC2_SG_OPEN_HTTPS",
         "EC2_UNUSED_EIP",
+        "EC2_UNUSED_SECURITY_GROUP",
+        "EC2_PUBLIC_INSTANCE_EXPOSURE",
         "EBS_UNATTACHED_VOLUME",
         "EBS_UNENCRYPTED_VOLUME",
         "EBS_DEFAULT_ENCRYPTION_DISABLED",

@@ -58,6 +58,7 @@ Options:
 | Option | Purpose |
 | --- | --- |
 | `--profile PROFILE` | Use a named AWS profile. |
+| `--config PATH` | Load TOML config for required tags and critical-resource tag values. |
 | `--role-arn ROLE_ARN` | Assume a read-only audit role before scanning. |
 | `--external-id EXTERNAL_ID` | Pass an external ID when assuming a role. |
 | `--regions REGION1,REGION2` | Scan only the listed AWS regions. |
@@ -129,6 +130,31 @@ aws-security-auditor scan --profile audit --notify-on HIGH
 | `--fail-on` | Still controls the command exit code independently from Slack. |
 
 The webhook URL is never printed by the tool.
+
+## Config file
+
+Use a TOML config file when tag names or critical-resource markers differ by environment:
+
+```bash
+aws-security-auditor scan --profile audit --config aws-security-auditor.toml
+```
+
+Example:
+
+```toml
+required_tags = ["Owner", "Environment", "CostCenter"]
+
+[critical_resource_tags]
+Environment = ["prod", "production", "prd"]
+Criticality = ["high", "critical", "tier1"]
+```
+
+| Setting | Purpose |
+| --- | --- |
+| `required_tags` | Tags required by the tag governance check. |
+| `critical_resource_tags` | Tag values that raise severity for resilience-sensitive findings such as disabled RDS backups or deletion protection. |
+
+Tags tune severity and context only. Missing tags do not suppress direct security exposure checks.
 
 ## Hygiene vs baseline checks
 
@@ -202,11 +228,12 @@ Implemented checks:
 
 | Area | Checks |
 | --- | --- |
-| EC2 security groups | Public ingress for SSH, RDP, HTTP, HTTPS, database ports, all ports, and other ports; default security groups with public ingress. |
+| EC2 security groups | Public ingress for SSH, RDP, HTTP, HTTPS, database ports, all ports, and other ports; default security groups with public ingress; unused security groups. |
 | EC2 capacity and images | Unused Elastic IPs, unattached or unencrypted EBS volumes, disabled EBS encryption by default, old account-owned EBS snapshots, public account-owned AMIs, public EBS snapshots. |
-| RDS | Public, unencrypted, or under-backed-up database instances. |
+| EC2 instances | Public instances whose security groups expose internet ingress. |
+| RDS | Public, unencrypted, under-backed-up, or deletion-protection-disabled database instances. |
 | S3 | Public ACL/policy, Public Access Block, encryption, versioning, and access logging. |
-| IAM | Root MFA, root access keys, password policy, old or unused access keys, console users without MFA, direct inline user policies. |
+| IAM | Root MFA, root access keys, password policy, old or unused access keys, console users without MFA, direct inline user policies, AdministratorAccess exposure. |
 | Load balancing | Internet-facing Application and Network Load Balancers. |
 | ECR | Scan-on-push settings. |
 | KMS | Key rotation for eligible customer-managed keys. |

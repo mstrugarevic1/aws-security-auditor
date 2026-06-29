@@ -7,7 +7,12 @@ from typing import Annotated
 
 import typer
 
-from aws_security_auditor.config import ALL_SERVICES, DEFAULT_REQUIRED_TAGS, ScanConfig
+from aws_security_auditor.config import (
+    ALL_SERVICES,
+    DEFAULT_REQUIRED_TAGS,
+    ScanConfig,
+    load_config_file,
+)
 from aws_security_auditor.models import SEVERITY_ORDER, ScanReport, Severity
 from aws_security_auditor.notifiers.slack import notify_slack
 from aws_security_auditor.reporting.console import render_console
@@ -27,6 +32,10 @@ def main() -> None:
 @app.command()
 def scan(
     profile: Annotated[str | None, typer.Option(help="AWS profile name.")] = None,
+    config_file: Annotated[
+        Path | None,
+        typer.Option("--config", help="TOML config file for tags and scan tuning."),
+    ] = None,
     role_arn: Annotated[str | None, typer.Option(help="Optional role ARN to assume.")] = None,
     external_id: Annotated[str | None, typer.Option(help="External ID for AssumeRole.")] = None,
     regions: Annotated[str | None, typer.Option(help="Comma-separated AWS regions.")] = None,
@@ -73,7 +82,18 @@ def scan(
     )
     excluded_regions = _csv(exclude_regions)
     selected_services = _services(services)
-    tags = tuple(t.strip() for t in required_tags.split(",") if t.strip())
+    file_required_tags: tuple[str, ...] | None = None
+    critical_resource_tags: dict[str, tuple[str, ...]] | None = None
+    if config_file:
+        try:
+            file_required_tags, critical_resource_tags = load_config_file(config_file)
+        except ValueError as exc:
+            raise typer.BadParameter(str(exc), param_hint="--config") from exc
+    tags = (
+        tuple(t.strip() for t in required_tags.split(",") if t.strip())
+        if required_tags != ",".join(DEFAULT_REQUIRED_TAGS) or file_required_tags is None
+        else file_required_tags
+    )
     config = ScanConfig(
         profile=profile,
         role_arn=role_arn,
@@ -90,6 +110,7 @@ def scan(
         snapshot_age_days=snapshot_age_days,
         access_key_age_days=access_key_age_days,
         required_tags=tags,
+        critical_resource_tags=critical_resource_tags or ScanConfig().critical_resource_tags,
         max_workers=max_workers,
     )
     report = run_scan(config)

@@ -130,7 +130,9 @@ def _scan_region(session: object, region: str, account_id: str, config: ScanConf
     if _enabled(config, "kms"):
         results.append(scan_kms(client(session, "kms", region), region))
     if _enabled(config, "rds"):
-        results.append(scan_rds(client(session, "rds", region), region))
+        results.append(
+            scan_rds(client(session, "rds", region), region, config.critical_resource_tags)
+        )
     if _enabled(config, "tags"):
         results.append(
             scan_regional_tags(

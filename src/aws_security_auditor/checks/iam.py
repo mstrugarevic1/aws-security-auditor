@@ -10,7 +10,7 @@ from aws_security_auditor.readonly_client import ReadOnlyAwsClient
 
 
 def scan_iam(iam: ReadOnlyAwsClient, access_key_age_days: int) -> CheckResult:
-    result = CheckResult(checks=6)
+    result = CheckResult(checks=7)
     cutoff = datetime.now(UTC) - timedelta(days=access_key_age_days)
     try:
         summary = iam.call("get_account_summary").get("SummaryMap", {})
@@ -41,6 +41,7 @@ def scan_iam(iam: ReadOnlyAwsClient, access_key_age_days: int) -> CheckResult:
                 )
             )
         _password_policy_findings(iam, result)
+        _administrator_access_findings(iam, result)
 
         for page in iam.paginate("list_users"):
             users = page.get("Users", [])
@@ -142,6 +143,61 @@ def scan_iam(iam: ReadOnlyAwsClient, access_key_age_days: int) -> CheckResult:
     except (ClientError, BotoCoreError, KeyError, TypeError) as exc:
         return CheckResult(errors=[ScanError("IAM", "global", f"IAM scan skipped: {exc}")])
     return result
+
+
+def _administrator_access_findings(iam: ReadOnlyAwsClient, result: CheckResult) -> None:
+    for page in iam.paginate("get_account_authorization_details"):
+        for user in page.get("UserDetailList", []):
+            if _has_administrator_access(user):
+                result.findings.append(
+                    Finding(
+                        Severity.HIGH,
+                        "IAM_USER_ADMINISTRATOR_ACCESS",
+                        "IAM",
+                        "global",
+                        user.get("UserName", "unknown"),
+                        "IAM user has AdministratorAccess",
+                        "IAM user has the AWS managed AdministratorAccess policy attached.",
+                        "Prefer short-lived role access and remove direct administrator access.",
+                    )
+                )
+        for group in page.get("GroupDetailList", []):
+            if _has_administrator_access(group):
+                result.findings.append(
+                    Finding(
+                        Severity.MEDIUM,
+                        "IAM_GROUP_ADMINISTRATOR_ACCESS",
+                        "IAM",
+                        "global",
+                        group.get("GroupName", "unknown"),
+                        "IAM group has AdministratorAccess",
+                        "IAM group has the AWS managed AdministratorAccess policy attached.",
+                        "Review group membership and restrict administrator access.",
+                    )
+                )
+        for role in page.get("RoleDetailList", []):
+            if _has_administrator_access(role):
+                result.findings.append(
+                    Finding(
+                        Severity.MEDIUM,
+                        "IAM_ROLE_ADMINISTRATOR_ACCESS",
+                        "IAM",
+                        "global",
+                        role.get("RoleName", "unknown"),
+                        "IAM role has AdministratorAccess",
+                        "IAM role has the AWS managed AdministratorAccess policy attached.",
+                        "Review trust policy and restrict administrator access where possible.",
+                    )
+                )
+
+
+def _has_administrator_access(detail: dict[str, object]) -> bool:
+    return any(
+        policy.get("PolicyName") == "AdministratorAccess"
+        or str(policy.get("PolicyArn", "")).endswith("/AdministratorAccess")
+        for policy in detail.get("AttachedManagedPolicies", [])
+        if isinstance(policy, dict)
+    )
 
 
 def _password_policy_findings(iam: ReadOnlyAwsClient, result: CheckResult) -> None:

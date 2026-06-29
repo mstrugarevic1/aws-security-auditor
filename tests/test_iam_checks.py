@@ -28,6 +28,39 @@ class FakeIam:
             return iter([{"MFADevices": []}])
         if operation == "list_user_policies":
             return iter([{"PolicyNames": ["inline"]}])
+        if operation == "get_account_authorization_details":
+            return iter(
+                [
+                    {
+                        "UserDetailList": [
+                            {
+                                "UserName": "admin-user",
+                                "AttachedManagedPolicies": [
+                                    {"PolicyName": "AdministratorAccess"}
+                                ],
+                            }
+                        ],
+                        "GroupDetailList": [
+                            {
+                                "GroupName": "admins",
+                                "AttachedManagedPolicies": [
+                                    {
+                                        "PolicyArn": "arn:aws:iam::aws:policy/AdministratorAccess"
+                                    }
+                                ],
+                            }
+                        ],
+                        "RoleDetailList": [
+                            {
+                                "RoleName": "admin-role",
+                                "AttachedManagedPolicies": [
+                                    {"PolicyName": "AdministratorAccess"}
+                                ],
+                            }
+                        ],
+                    }
+                ]
+            )
         raise AssertionError(operation)
 
     def call(self, operation: str, **kwargs: object) -> dict[str, object]:
@@ -51,4 +84,7 @@ def test_old_access_key_and_missing_mfa() -> None:
         "IAM_ROOT_MFA_DISABLED",
         "IAM_ROOT_ACCESS_KEYS_PRESENT",
         "IAM_WEAK_PASSWORD_POLICY",
+        "IAM_USER_ADMINISTRATOR_ACCESS",
+        "IAM_GROUP_ADMINISTRATOR_ACCESS",
+        "IAM_ROLE_ADMINISTRATOR_ACCESS",
     } <= {f.check_id for f in result.findings}
