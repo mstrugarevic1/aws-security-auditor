@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
+from datetime import date
 from enum import StrEnum
 
 
@@ -41,12 +42,27 @@ class ScanError:
 
 
 @dataclass(frozen=True)
+class SuppressedFinding:
+    finding: Finding
+    reason: str
+    expires: date
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "finding": self.finding.to_dict(),
+            "reason": self.reason,
+            "expires": self.expires.isoformat(),
+        }
+
+
+@dataclass(frozen=True)
 class ScanSummary:
     scanned_regions: int
     checks_executed: int
     resources_inspected: int
     errors: int
     duration_seconds: float
+    suppressed: int = 0
 
 
 @dataclass(frozen=True)
@@ -59,6 +75,7 @@ class ScanReport:
     findings: list[Finding]
     errors: list[ScanError]
     summary: ScanSummary
+    suppressed_findings: list[SuppressedFinding] = field(default_factory=list)
 
 
 def sort_findings(findings: list[Finding]) -> list[Finding]:

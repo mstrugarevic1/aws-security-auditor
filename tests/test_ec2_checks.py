@@ -106,6 +106,10 @@ class FakeEc2:
                                     "InstanceId": "i-1",
                                     "PublicIpAddress": "203.0.113.10",
                                     "SecurityGroups": [{"GroupId": "sg-2"}],
+                                    "MetadataOptions": {
+                                        "HttpEndpoint": "enabled",
+                                        "HttpTokens": "required",
+                                    },
                                 }
                             ]
                         }
@@ -154,3 +158,53 @@ def test_ec2_continues_security_group_scan_after_ebs_error() -> None:
 
     assert "EC2_SG_OPEN_SSH" in check_ids
     assert result.errors
+
+
+class FakeEc2Imds(FakeEc2):
+    def __init__(self, instances: list[dict[str, object]]):
+        self.instances = instances
+
+    def paginate(self, operation: str, **kwargs: object):
+        if operation == "describe_instances":
+            return iter(
+                [
+                    {"Reservations": [{"Instances": self.instances[:1]}]},
+                    {"Reservations": [{"Instances": self.instances[1:]}]},
+                ]
+            )
+        if operation == "describe_security_groups":
+            return iter([{"SecurityGroups": []}])
+        return super().paginate(operation, **kwargs)
+
+
+def test_ec2_imdsv2_not_required() -> None:
+    result = scan_ec2(  # type: ignore[arg-type]
+        FakeEc2Imds(
+            [
+                {
+                    "InstanceId": "i-optional",
+                    "MetadataOptions": {"HttpEndpoint": "enabled", "HttpTokens": "optional"},
+                },
+                {
+                    "InstanceId": "i-required",
+                    "MetadataOptions": {"HttpEndpoint": "enabled", "HttpTokens": "required"},
+                },
+                {
+                    "InstanceId": "i-disabled",
+                    "MetadataOptions": {"HttpEndpoint": "disabled", "HttpTokens": "optional"},
+                },
+                {"InstanceId": "i-missing"},
+                {
+                    "InstanceId": "i-terminated",
+                    "State": {"Name": "terminated"},
+                    "MetadataOptions": {"HttpEndpoint": "enabled", "HttpTokens": "optional"},
+                },
+            ]
+        ),
+        "us-east-1",
+        "123",
+        90,
+    )
+
+    imds = [f.resource_id for f in result.findings if f.check_id == "EC2_IMDSV2_NOT_REQUIRED"]
+    assert imds == ["i-optional", "i-missing"]

@@ -15,6 +15,7 @@ def render_json(report: ScanReport) -> str:
             "assumed_role": report.assumed_role,
             "regions": report.regions,
             "findings": [f.to_dict() for f in report.findings],
+            "suppressed_findings": [f.to_dict() for f in report.suppressed_findings],
             "errors": [e.to_dict() for e in report.errors],
             "summary": asdict(report.summary),
         },
