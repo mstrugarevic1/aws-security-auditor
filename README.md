@@ -18,6 +18,10 @@ cost, and governance posture issues.
 This tool never modifies AWS resources. It performs only read-only List, Get and Describe
 operations and can be used with a read-only IAM role.
 
+<p align="center">
+  <img src="docs/assets/terminal-scan-output.png" alt="AWS Security Auditor scan output">
+</p>
+
 This tool is not a replacement for AWS Security Hub, AWS Config, CloudTrail, Trusted Advisor,
 Prowler, or a formal security assessment. It is a point-in-time read-only scanner for quick
 account reviews.
