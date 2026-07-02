@@ -1,6 +1,15 @@
 from __future__ import annotations
 
-from aws_security_auditor.models import Finding, ScanReport, ScanSummary, Severity, sort_findings
+from datetime import date
+
+from aws_security_auditor.models import (
+    Finding,
+    ScanReport,
+    ScanSummary,
+    Severity,
+    SuppressedFinding,
+    sort_findings,
+)
 from aws_security_auditor.reporting.csv_report import render_csv
 from aws_security_auditor.reporting.json_report import render_json
 from aws_security_auditor.reporting.markdown import render_markdown
@@ -41,3 +50,22 @@ def test_csv_output() -> None:
     text = render_csv(_report())
     assert "severity,region,service,resource_id,check_id,title,description,recommendation" in text
     assert "HIGH,us-east-1,EC2,i-2,H,High,," in text
+
+
+def test_suppressed_findings_in_json_and_markdown_but_not_csv() -> None:
+    finding = Finding(Severity.HIGH, "H", "EC2", "us-east-1", "i-2", "High", "", "")
+    report = ScanReport(
+        "123",
+        "arn",
+        None,
+        None,
+        ["us-east-1"],
+        [],
+        [],
+        ScanSummary(1, 1, 2, 0, 0.1, suppressed=1),
+        [SuppressedFinding(finding, "accepted", date(2099, 1, 1))],
+    )
+
+    assert "suppressed_findings" in render_json(report)
+    assert "## Suppressed findings" in render_markdown(report)
+    assert "accepted" not in render_csv(report)

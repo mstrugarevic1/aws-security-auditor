@@ -33,7 +33,7 @@ def _public(rule: dict[str, Any]) -> bool:
 def scan_ec2(
     ec2: ReadOnlyAwsClient, region: str, account_id: str, snapshot_age_days: int
 ) -> CheckResult:
-    result = CheckResult(checks=10)
+    result = CheckResult(checks=11)
     security_groups: dict[str, dict[str, Any]] = {}
     try:
         if ec2.call("get_ebs_encryption_by_default").get("EbsEncryptionByDefault") is not True:
@@ -89,6 +89,7 @@ def scan_ec2(
                 instances = reservation.get("Instances", [])
                 result.resources += len(instances)
                 for instance in instances:
+                    result.findings.extend(_imds_findings(instance, region))
                     result.findings.extend(
                         _public_instance_findings(instance, security_groups, region)
                     )
@@ -291,6 +292,32 @@ def _public_instance_findings(
                 )
             )
     return findings
+
+
+def _imds_findings(instance: dict[str, Any], region: str) -> list[Finding]:
+    if instance.get("State", {}).get("Name") == "terminated":
+        return []
+    metadata_options = instance.get("MetadataOptions", {})
+    if not isinstance(metadata_options, dict):
+        metadata_options = {}
+    http_endpoint = metadata_options.get("HttpEndpoint")
+    http_tokens = metadata_options.get("HttpTokens")
+    if http_endpoint == "disabled" or http_tokens == "required":
+        return []
+    instance_id = instance.get("InstanceId", "unknown")
+    return [
+        Finding(
+            Severity.MEDIUM,
+            "EC2_IMDSV2_NOT_REQUIRED",
+            "EC2",
+            region,
+            instance_id,
+            "EC2 instance does not require IMDSv2",
+            f"Instance metadata options: HttpEndpoint={http_endpoint} "
+            f"HttpTokens={http_tokens}.",
+            "Require IMDSv2 by setting HttpTokens to required.",
+        )
+    ]
 
 
 def _instance_has_public_ip(instance: dict[str, Any]) -> bool:

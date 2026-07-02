@@ -63,3 +63,16 @@ def test_source_has_no_prohibited_boto3_method_names() -> None:
 def test_elbv2_service_name_is_boto3_name() -> None:
     assert "elbv2" in ALLOWED_OPERATIONS
     assert "elasticloadbalancingv2" not in ALLOWED_OPERATIONS
+
+
+def test_new_readonly_operations_are_allowed() -> None:
+    assert {"describe_flow_logs", "describe_vpcs"} <= ALLOWED_OPERATIONS["ec2"]
+    assert {"list_functions", "list_function_url_configs"} <= ALLOWED_OPERATIONS["lambda"]
+    assert {
+        "list_clusters",
+        "list_services",
+        "describe_services",
+        "describe_task_definition",
+    } <= ALLOWED_OPERATIONS["ecs"]
+    assert {"list_secrets"} <= ALLOWED_OPERATIONS["secretsmanager"]
+    assert {"list_analyzers"} <= ALLOWED_OPERATIONS["accessanalyzer"]

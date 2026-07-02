@@ -7,6 +7,7 @@ from dataclasses import replace
 from botocore.exceptions import BotoCoreError, ClientError
 
 from aws_security_auditor.auth import build_session, client
+from aws_security_auditor.checks.access_analyzer import scan_access_analyzer
 from aws_security_auditor.checks.account import (
     scan_cloudtrail,
     scan_config,
@@ -15,11 +16,15 @@ from aws_security_auditor.checks.account import (
 )
 from aws_security_auditor.checks.base import CheckResult
 from aws_security_auditor.checks.ec2 import scan_ec2
+from aws_security_auditor.checks.ecs import scan_ecs
 from aws_security_auditor.checks.iam import scan_iam
+from aws_security_auditor.checks.lambda_functions import scan_lambda
 from aws_security_auditor.checks.network import scan_ecr, scan_elbv2, scan_kms
 from aws_security_auditor.checks.rds import scan_rds
 from aws_security_auditor.checks.s3 import scan_s3
+from aws_security_auditor.checks.secretsmanager import scan_secretsmanager
 from aws_security_auditor.checks.tags import scan_regional_tags
+from aws_security_auditor.checks.vpc import scan_vpc
 from aws_security_auditor.config import DEFAULT_SERVICES, ScanConfig
 from aws_security_auditor.models import (
     SEVERITY_ORDER,
@@ -30,18 +35,24 @@ from aws_security_auditor.models import (
     sort_findings,
 )
 from aws_security_auditor.regions import discover_regions
+from aws_security_auditor.suppressions import apply_suppressions
 
 REGIONAL_SERVICES = {
+    "accessanalyzer",
     "cloudtrail",
     "config",
     "ec2",
+    "ecs",
     "ecr",
     "elbv2",
     "guardduty",
     "kms",
+    "lambda",
     "rds",
     "securityhub",
+    "secretsmanager",
     "tags",
+    "vpc",
 }
 
 
@@ -83,6 +94,9 @@ def run_scan(config: ScanConfig) -> ScanReport:
                 )
 
     findings = [finding for result in results for finding in result.findings]
+    findings, suppressed_findings = apply_suppressions(
+        findings, config.suppressions, str(account_id)
+    )
     if config.severity:
         minimum = Severity(config.severity.upper())
         findings = [
@@ -95,6 +109,7 @@ def run_scan(config: ScanConfig) -> ScanReport:
         resources_inspected=sum(result.resources for result in results),
         errors=len(errors),
         duration_seconds=round(time.monotonic() - started, 1),
+        suppressed=len(suppressed_findings),
     )
     return ScanReport(
         account_id,
@@ -105,6 +120,7 @@ def run_scan(config: ScanConfig) -> ScanReport:
         sort_findings(findings),
         errors,
         summary,
+        suppressed_findings,
     )
 
 
@@ -113,6 +129,10 @@ def _scan_region(session: object, region: str, account_id: str, config: ScanConf
     results: list[CheckResult] = []
     if _enabled(config, "cloudtrail"):
         results.append(scan_cloudtrail(client(session, "cloudtrail", region), region))
+    if _enabled(config, "accessanalyzer"):
+        results.append(
+            scan_access_analyzer(client(session, "accessanalyzer", region), region)
+        )
     if _enabled(config, "config"):
         results.append(scan_config(client(session, "config", region), region))
     if _enabled(config, "guardduty"):
@@ -123,6 +143,12 @@ def _scan_region(session: object, region: str, account_id: str, config: ScanConf
         results.append(
             scan_ec2(client(session, "ec2", region), region, account_id, config.snapshot_age_days)
         )
+    if _enabled(config, "vpc"):
+        results.append(scan_vpc(client(session, "ec2", region), region))
+    if _enabled(config, "lambda"):
+        results.append(scan_lambda(client(session, "lambda", region), region))
+    if _enabled(config, "ecs"):
+        results.append(scan_ecs(client(session, "ecs", region), region))
     if _enabled(config, "elbv2"):
         results.append(scan_elbv2(client(session, "elbv2", region), region))
     if _enabled(config, "ecr"):
@@ -132,6 +158,10 @@ def _scan_region(session: object, region: str, account_id: str, config: ScanConf
     if _enabled(config, "rds"):
         results.append(
             scan_rds(client(session, "rds", region), region, config.critical_resource_tags)
+        )
+    if _enabled(config, "secretsmanager"):
+        results.append(
+            scan_secretsmanager(client(session, "secretsmanager", region), region)
         )
     if _enabled(config, "tags"):
         results.append(

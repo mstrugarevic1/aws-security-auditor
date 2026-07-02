@@ -3,3 +3,17 @@ required_tags = ["Owner", "Environment", "CostCenter"]
 [critical_resource_tags]
 Environment = ["prod", "production", "prd"]
 Criticality = ["high", "critical", "tier1"]
+
+[[suppressions]]
+check_id = "EC2_SG_OPEN_SSH"
+resource_id = "sg-0123456789abcdef0"
+region = "eu-central-1"
+account_id = "123456789012"
+reason = "Temporary vendor access"
+expires = "2026-08-01"
+
+[[suppressions]]
+check_id = "SECRETSMANAGER_ROTATION_DISABLED"
+resource_id = "arn:aws:secretsmanager:eu-central-1:123456789012:secret:static-api-key"
+reason = "Third-party API key cannot be automatically rotated"
+expires = "2026-12-31"
