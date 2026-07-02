@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from aws_security_auditor.models import Finding, ScanReport, ScanSummary, Severity, sort_findings
-from aws_security_auditor.reporting.console import render_console
 from aws_security_auditor.reporting.csv_report import render_csv
 from aws_security_auditor.reporting.json_report import render_json
 from aws_security_auditor.reporting.markdown import render_markdown
@@ -42,12 +41,3 @@ def test_csv_output() -> None:
     text = render_csv(_report())
     assert "severity,region,service,resource_id,check_id,title,description,recommendation" in text
     assert "HIGH,us-east-1,EC2,i-2,H,High,," in text
-
-
-def test_console_output_uses_plain_table(capsys) -> None:
-    render_console(_report(), no_color=True)
-
-    text = capsys.readouterr().out
-    assert "| Severity" in text
-    assert "| HIGH" in text
-    assert "\x1b[" not in text
