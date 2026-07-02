@@ -247,34 +247,6 @@ Hub aggregates posture findings across accounts and services.
 `aws-security-auditor` is different: it gives a fast read-only snapshot without requiring those
 managed services to be enabled first.
 
-## Example Output
-
-```text
-+----------+--------------------------+---------+-----------+-------------------------------+
-| Severity | Region                   | Service | Resource  | Finding                       |
-+----------+--------------------------+---------+-----------+-------------------------------+
-| HIGH     | global                   | IAM     | root      | Root account MFA is disabled  |
-| HIGH     | eu-central-1 (Frankfurt) | EC2     | sg-012345 | SSH open to the world         |
-| MEDIUM   | eu-west-1 (Ireland)      | RDS     | prod-db   | Deletion protection disabled  |
-| LOW      | us-east-1 (N. Virginia)  | ECR     | app       | ECR scan on push is disabled  |
-+----------+--------------------------+---------+-----------+-------------------------------+
-
-Scanned regions: 18
-Checks executed: 31
-Resources inspected: 421
-HIGH: 4
-MEDIUM: 6
-LOW: 3
-Errors: 1
-Duration: 12.4s
-```
-
-With `--fail-on HIGH`, the report is still rendered, but the command exits with status `1`
-when at least one `HIGH` finding is present.
-
-JSON and Markdown reports contain no ANSI color codes.
-CSV reports contain one row per finding.
-
 ## Safety
 
 All AWS calls pass through a local read-only client wrapper with an explicit operation allowlist.
