@@ -18,41 +18,97 @@ def scan_ecs(ecs: ReadOnlyAwsClient, region: str) -> CheckResult:
     try:
         for cluster_page in ecs.paginate("list_clusters"):
             for cluster_arn in cluster_page.get("clusterArns", []):
-                for service_arns in _service_batches(ecs, str(cluster_arn)):
-                    if not service_arns:
-                        continue
-                    services = ecs.call(
-                        "describe_services",
-                        cluster=cluster_arn,
-                        services=service_arns,
-                    ).get("services", [])
-                    result.resources += len(services)
-                    for service in services:
-                        result.findings.extend(
-                            _public_ip_findings(service, str(cluster_arn), region)
-                        )
-                        task_definition_arn = service.get("taskDefinition")
-                        if not isinstance(task_definition_arn, str):
-                            continue
-                        task_definition = task_definitions.get(task_definition_arn)
-                        if task_definition is None:
-                            task_definition = ecs.call(
-                                "describe_task_definition",
-                                taskDefinition=task_definition_arn,
-                            ).get("taskDefinition", {})
-                            task_definitions[task_definition_arn] = task_definition
-                        result.findings.extend(
-                            _privileged_findings(
-                                task_definition,
-                                service,
-                                str(cluster_arn),
-                                region,
-                                privileged_seen,
-                            )
-                        )
+                _scan_cluster(
+                    ecs,
+                    region,
+                    str(cluster_arn),
+                    result,
+                    task_definitions,
+                    privileged_seen,
+                )
     except (ClientError, BotoCoreError, KeyError, TypeError) as exc:
         return CheckResult(errors=[ScanError("ECS", region, f"ECS scan skipped: {exc}")])
     return result
+
+
+def _scan_cluster(
+    ecs: ReadOnlyAwsClient,
+    region: str,
+    cluster_arn: str,
+    result: CheckResult,
+    task_definitions: dict[str, dict[str, Any]],
+    privileged_seen: set[tuple[str, str]],
+) -> None:
+    try:
+        for service_arns in _service_batches(ecs, cluster_arn):
+            if not service_arns:
+                continue
+            try:
+                services = ecs.call(
+                    "describe_services",
+                    cluster=cluster_arn,
+                    services=service_arns,
+                ).get("services", [])
+            except (ClientError, BotoCoreError, KeyError, TypeError) as exc:
+                result.errors.append(
+                    ScanError("ECS", region, f"ECS service batch skipped: {exc}")
+                )
+                continue
+            result.resources += len(services)
+            for service in services:
+                _scan_service(
+                    ecs,
+                    region,
+                    cluster_arn,
+                    service,
+                    result,
+                    task_definitions,
+                    privileged_seen,
+                )
+    except (ClientError, BotoCoreError, KeyError, TypeError) as exc:
+        result.errors.append(ScanError("ECS", region, f"ECS cluster skipped: {exc}"))
+        return
+
+
+def _scan_service(
+    ecs: ReadOnlyAwsClient,
+    region: str,
+    cluster_arn: str,
+    service: dict[str, Any],
+    result: CheckResult,
+    task_definitions: dict[str, dict[str, Any]],
+    privileged_seen: set[tuple[str, str]],
+) -> None:
+    result.findings.extend(_public_ip_findings(service, cluster_arn, region))
+    task_definition_arn = service.get("taskDefinition")
+    if not isinstance(task_definition_arn, str):
+        return
+    task_definition = task_definitions.get(task_definition_arn)
+    if task_definition is None:
+        try:
+            task_definition = ecs.call(
+                "describe_task_definition",
+                taskDefinition=task_definition_arn,
+            ).get("taskDefinition", {})
+        except (ClientError, BotoCoreError, KeyError, TypeError) as exc:
+            result.errors.append(
+                ScanError(
+                    "ECS",
+                    region,
+                    f"ECS task definition skipped for {task_definition_arn}: {exc}",
+                )
+            )
+            return
+        task_definitions[task_definition_arn] = task_definition
+    result.findings.extend(
+        _privileged_findings(
+            task_definition,
+            service,
+            cluster_arn,
+            region,
+            privileged_seen,
+        )
+    )
 
 
 def _service_batches(ecs: ReadOnlyAwsClient, cluster_arn: str) -> Iterator[list[str]]:
