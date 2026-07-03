@@ -13,7 +13,7 @@ from aws_security_auditor.reporting.regions import region_label
 STYLES = {Severity.HIGH: "bold red", Severity.MEDIUM: "bold yellow", Severity.LOW: "bold cyan"}
 
 
-def render_console(report: ScanReport, no_color: bool = False) -> None:
+def render_console(report: ScanReport, no_color: bool = False, verbose: bool = False) -> None:
     console = Console(no_color=no_color or not sys.stdout.isatty())
     console.print(f"Account: {report.account_id}")
     console.print(f"ARN: {report.arn}")
@@ -46,8 +46,19 @@ def render_console(report: ScanReport, no_color: bool = False) -> None:
     console.print(f"HIGH: {counts[Severity.HIGH]}")
     console.print(f"MEDIUM: {counts[Severity.MEDIUM]}")
     console.print(f"LOW: {counts[Severity.LOW]}")
+    console.print(f"Suppressed: {report.summary.suppressed}")
     console.print(f"Errors: {report.summary.errors}")
     console.print(f"Duration: {report.summary.duration_seconds}s")
+    if verbose and report.suppressed_findings:
+        console.print("Suppressed findings:", style="yellow")
+        for suppressed in report.suppressed_findings:
+            finding = suppressed.finding
+            console.print(
+                f"{finding.check_id} {region_label(finding.region)} "
+                f"{finding.resource_id}: {suppressed.reason} "
+                f"(expires {suppressed.expires.isoformat()})",
+                style="yellow",
+            )
     if report.errors:
         console.print("Warnings:", style="yellow")
         for error in report.errors:

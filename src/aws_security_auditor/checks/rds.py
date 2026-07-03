@@ -12,7 +12,7 @@ def scan_rds(
     region: str,
     critical_resource_tags: dict[str, tuple[str, ...]] | None = None,
 ) -> CheckResult:
-    result = CheckResult(checks=5)
+    result = CheckResult(checks=6)
     try:
         for page in rds.paginate("describe_db_instances"):
             instances = page.get("DBInstances", [])
@@ -20,6 +20,7 @@ def scan_rds(
             for db in instances:
                 dbid = db.get("DBInstanceIdentifier", "unknown")
                 critical = _is_critical(rds, db, critical_resource_tags or {})
+                engine = str(db.get("Engine", "")).lower()
                 if db.get("PubliclyAccessible"):
                     result.findings.append(
                         Finding(
@@ -86,9 +87,28 @@ def scan_rds(
                             "Enable deletion protection where accidental deletion would be risky.",
                         )
                     )
+                if critical and db.get("MultiAZ") is not True and not _skip_multiaz_engine(engine):
+                    result.findings.append(
+                        Finding(
+                            Severity.HIGH,
+                            "RDS_PRODUCTION_NOT_MULTI_AZ",
+                            "RDS",
+                            region,
+                            dbid,
+                            "Production RDS instance is not Multi-AZ",
+                            f"RDS instance engine={engine or 'unknown'} is tagged as "
+                            "production or critical but MultiAZ is not enabled.",
+                            "Enable an appropriate Multi-AZ deployment or document "
+                            "the accepted availability risk.",
+                        )
+                    )
     except (ClientError, BotoCoreError, KeyError, TypeError, ValueError) as exc:
         return CheckResult(errors=[ScanError("RDS", region, f"RDS scan skipped: {exc}")])
     return result
+
+
+def _skip_multiaz_engine(engine: str) -> bool:
+    return engine.startswith("aurora") or engine.startswith("custom-")
 
 
 def _is_critical(

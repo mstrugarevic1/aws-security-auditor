@@ -52,6 +52,8 @@ Common examples:
 aws-security-auditor scan --profile audit
 aws-security-auditor scan --profile audit --regions eu-central-1,eu-west-1
 aws-security-auditor scan --profile audit --services ec2,s3,iam
+aws-security-auditor scan --profile audit --services ec2,vpc,lambda,ecs,secretsmanager,rds
+aws-security-auditor scan --profile audit --services cloudtrail,accessanalyzer
 aws-security-auditor scan --profile audit --config examples/aws-security-auditor.toml
 aws-security-auditor scan --profile audit --fail-on HIGH --notify-on HIGH
 ```
@@ -89,13 +91,18 @@ Use `--services` to scan only selected services.
 | Service | Default | Scope |
 | --- | --- | --- |
 | `ec2` | Yes | EC2 instances, security groups, EBS volumes, snapshots, AMIs, and Elastic IPs. |
+| `ecs` | Yes | ECS services and current task definitions. Standalone tasks are out of scope. |
 | `ecr` | Yes | ECR repository scan-on-push settings. |
 | `elbv2` | Yes | Application and Network Load Balancers. |
 | `iam` | Yes | Account-level IAM posture. |
 | `kms` | Yes | Customer-managed KMS key rotation. |
+| `lambda` | Yes | Lambda Function URL authentication. |
 | `rds` | Yes | RDS public access, encryption, and backup posture. |
 | `s3` | Yes | S3 bucket public access, encryption, versioning, and logging. |
+| `secretsmanager` | Yes | Customer-managed secret rotation. Secret values are never read. |
 | `tags` | Yes | Required tags on supported resources. |
+| `vpc` | Yes | VPC-level Flow Logs. |
+| `accessanalyzer` | No | IAM Access Analyzer external-access analyzer baseline. |
 | `cloudtrail` | No | Account baseline check for CloudTrail trails. |
 | `config` | No | Account baseline check for AWS Config recorders. |
 | `guardduty` | No | Account baseline check for GuardDuty detectors. |
@@ -114,6 +121,22 @@ aws-security-auditor scan \
   --config examples/aws-security-auditor.toml \
   --fail-on HIGH \
   --notify-on HIGH
+```
+
+Selected service scan:
+
+```bash
+aws-security-auditor scan \
+  --profile audit \
+  --services ec2,vpc,lambda,ecs,secretsmanager,rds
+```
+
+Baseline-only scan:
+
+```bash
+aws-security-auditor scan \
+  --profile audit \
+  --services cloudtrail,accessanalyzer
 ```
 
 ## Slack notifications
@@ -148,6 +171,14 @@ required_tags = ["Owner", "Environment", "CostCenter"]
 [critical_resource_tags]
 Environment = ["prod", "production", "prd"]
 Criticality = ["high", "critical", "tier1"]
+
+[[suppressions]]
+check_id = "EC2_SG_OPEN_SSH"
+resource_id = "sg-0123456789abcdef0"
+region = "eu-central-1"
+account_id = "123456789012"
+reason = "Temporary vendor access"
+expires = "2026-08-01"
 ```
 
 See [examples/aws-security-auditor.toml](examples/aws-security-auditor.toml) for a reusable
@@ -157,8 +188,19 @@ starting point.
 | --- | --- |
 | `required_tags` | Tags required by the tag governance check. |
 | `critical_resource_tags` | Tag values that raise severity for resilience-sensitive findings such as disabled RDS backups or deletion protection. |
+| `suppressions` | Time-limited exact-match finding suppressions. |
 
 Tags tune severity and context only. Missing tags do not suppress direct security exposure checks.
+
+Suppressions require `check_id`, `resource_id`, `reason`, and `expires`. `region` and
+`account_id` are optional exact-match constraints. Suppressions do not support wildcards,
+regular expressions, service-wide rules, severity-only rules, or permanent suppressions.
+The expiration date is valid through that UTC date. Expired suppressions are logged as warnings
+and stop suppressing findings.
+
+Suppressed findings are removed before severity filtering, Slack notification, and `--fail-on`
+evaluation. They remain auditable in console summary counts, verbose console output, JSON, and
+Markdown. CSV reports include active findings only.
 
 ## Hygiene vs baseline checks
 
@@ -168,11 +210,12 @@ encryption, missing backups, unused network resources, and required tag coverage
 Account baseline services are available when explicitly selected:
 
 ```bash
-aws-security-auditor scan --services cloudtrail,config,guardduty,securityhub
+aws-security-auditor scan --services cloudtrail,config,guardduty,securityhub,accessanalyzer
 ```
 
-CloudTrail, AWS Config, GuardDuty, and Security Hub are important account setup controls. Their
-absence is treated as a baseline/setup gap rather than a default resource hygiene finding.
+CloudTrail, AWS Config, GuardDuty, Security Hub, and IAM Access Analyzer are important account
+setup controls. Their absence is treated as a baseline/setup gap rather than a default resource
+hygiene finding.
 
 Public access, IAM risk, public snapshots, and similar direct risks are evaluated from AWS
 resource configuration whether tags exist or not.
@@ -229,15 +272,19 @@ Implemented checks:
 | --- | --- |
 | EC2 security groups | Public ingress for SSH, RDP, HTTP, HTTPS, database ports, all ports, and other ports; default security groups with public ingress; unused security groups. |
 | EC2 capacity and images | Unused Elastic IPs, unattached or unencrypted EBS volumes, disabled EBS encryption by default, old account-owned EBS snapshots, public account-owned AMIs, public EBS snapshots. |
-| EC2 instances | Public instances whose security groups expose internet ingress. |
-| RDS | Public, unencrypted, under-backed-up, or deletion-protection-disabled database instances. |
+| EC2 instances | Public instances whose security groups expose internet ingress; IMDSv2 not required (`EC2_IMDSV2_NOT_REQUIRED`). |
+| VPC | Missing active VPC-level Flow Logs (`VPC_FLOW_LOGS_DISABLED`). |
+| Lambda | Public unauthenticated Function URLs (`LAMBDA_PUBLIC_FUNCTION_URL`). |
+| ECS | Services assigning public IPs (`ECS_SERVICE_PUBLIC_IP_ENABLED`); privileged containers in service task definitions (`ECS_PRIVILEGED_CONTAINER`). |
+| Secrets Manager | Customer-managed secrets without automatic rotation (`SECRETSMANAGER_ROTATION_DISABLED`). |
+| RDS | Public, unencrypted, under-backed-up, deletion-protection-disabled, or production non-Multi-AZ database instances (`RDS_PRODUCTION_NOT_MULTI_AZ`). |
 | S3 | Public ACL/policy, Public Access Block, encryption, versioning, and access logging. |
 | IAM | Root MFA, root access keys, password policy, old or unused access keys, console users without MFA, direct inline user policies, AdministratorAccess exposure. |
 | Load balancing | Internet-facing Application and Network Load Balancers. |
 | ECR | Scan-on-push settings. |
 | KMS | Key rotation for eligible customer-managed keys. |
 | Tags | Missing required tags on EC2 instances, EBS volumes, and RDS instances. |
-| Baseline services | CloudTrail trails, AWS Config recorders, GuardDuty detectors, and Security Hub enablement when explicitly selected. |
+| Baseline services | CloudTrail trails, log-file validation and KMS encryption (`CLOUDTRAIL_LOG_VALIDATION_DISABLED`, `CLOUDTRAIL_LOGS_NOT_KMS_ENCRYPTED`); AWS Config recorders; GuardDuty detectors; Security Hub; Access Analyzer external-access analyzers (`ACCESS_ANALYZER_EXTERNAL_ACCESS_DISABLED`) when explicitly selected. |
 
 ## How this differs from AWS native services
 
@@ -258,7 +305,9 @@ or cleanup flag.
 
 - It checks common security posture issues only.
 - It does not inspect S3 objects or object contents.
+- It does not read Secrets Manager secret values.
 - It does not remediate findings.
+- ECS checks cover services and their current task definitions, not standalone tasks.
 - IAM direct managed policy attachment checks are intentionally omitted because the AWS API name
   contains `Attach`, which this project blocks by policy.
 - API errors are reported and the scan continues where possible.
