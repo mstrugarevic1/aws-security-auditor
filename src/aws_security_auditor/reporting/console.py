@@ -11,10 +11,11 @@ from aws_security_auditor.models import ScanReport, Severity
 from aws_security_auditor.reporting.regions import region_label
 
 STYLES = {Severity.HIGH: "bold red", Severity.MEDIUM: "bold yellow", Severity.LOW: "bold cyan"}
+SERVICE_LABELS = {"SecretsManager": "Secrets"}
 
 
 def render_console(report: ScanReport, no_color: bool = False, verbose: bool = False) -> None:
-    console = Console(no_color=no_color or not sys.stdout.isatty())
+    console = Console(no_color=no_color or not sys.stdout.isatty(), emoji=False)
     console.print(f"Account: {report.account_id}")
     console.print(f"ARN: {report.arn}")
     if report.profile:
@@ -24,17 +25,17 @@ def render_console(report: ScanReport, no_color: bool = False, verbose: bool = F
     console.print(f"Regions scanned: {len(report.regions)}")
 
     table = Table(box=box.ASCII, show_lines=False)
-    table.add_column("Severity", width=8)
-    table.add_column("Region", min_width=16)
-    table.add_column("Service", width=10)
+    table.add_column("Severity", width=8, no_wrap=True)
+    table.add_column("Region", no_wrap=True)
+    table.add_column("Service", no_wrap=True)
     table.add_column("Resource", overflow="fold")
     table.add_column("Finding", ratio=2)
     for f in report.findings:
         table.add_row(
             Text(f.severity.value, style=STYLES[f.severity]),
-            region_label(f.region),
-            f.service,
-            f.resource_id,
+            f.region,
+            _console_service(f.service),
+            _console_resource(f.resource_id),
             f.title,
         )
     console.print(table)
@@ -66,3 +67,17 @@ def render_console(report: ScanReport, no_color: bool = False, verbose: bool = F
                 f"{error.service} {region_label(error.region)}: {error.message}",
                 style="yellow",
             )
+
+
+def _console_service(service: str) -> str:
+    return SERVICE_LABELS.get(service, service)
+
+
+def _console_resource(resource_id: str) -> str:
+    if ":function:" in resource_id:
+        return "function:" + resource_id.rsplit(":function:", 1)[1]
+    if ":secret:" in resource_id:
+        return "secret:" + resource_id.rsplit(":secret:", 1)[1]
+    if ":loadbalancer/" in resource_id:
+        return resource_id.rsplit(":loadbalancer/", 1)[1]
+    return resource_id
