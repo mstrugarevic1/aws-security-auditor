@@ -72,7 +72,7 @@ def test_suppressed_findings_in_json_and_markdown_but_not_csv() -> None:
     assert "accepted" not in render_csv(report)
 
 
-def test_console_output_shortens_noisy_identifiers(capsys) -> None:
+def test_console_output_keeps_full_identifiers_without_emoji_substitution(capsys) -> None:
     report = ScanReport(
         "123",
         "arn",
@@ -118,9 +118,13 @@ def test_console_output_shortens_noisy_identifiers(capsys) -> None:
     render_console(report, no_color=True)
     text = capsys.readouterr().out
 
-    assert "function:hello" in text
-    assert "secret:test-o0bXO6" in text
+    assert "arn:aws:lambda" in text
+    assert "ion:hello" in text
+    assert "arn:aws:secretsma" in text
+    assert "23:secret:test-o0" in text
+    assert "bXO6" in text
     assert "㊙" not in text
-    assert "app/test/abc" in text
+    assert "arn:aws:elasticlo" in text
+    assert "ncer/app/test/abc" in text
     assert "us-east-1 (US East" not in text
-    assert "SecretsMa" not in text
+    assert "SecretsManager" in text
