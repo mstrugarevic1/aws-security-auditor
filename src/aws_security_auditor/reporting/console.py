@@ -11,7 +11,6 @@ from aws_security_auditor.models import ScanReport, Severity
 from aws_security_auditor.reporting.regions import region_label
 
 STYLES = {Severity.HIGH: "bold red", Severity.MEDIUM: "bold yellow", Severity.LOW: "bold cyan"}
-SERVICE_LABELS = {"SecretsManager": "Secrets"}
 
 
 def render_console(report: ScanReport, no_color: bool = False, verbose: bool = False) -> None:
@@ -34,8 +33,8 @@ def render_console(report: ScanReport, no_color: bool = False, verbose: bool = F
         table.add_row(
             Text(f.severity.value, style=STYLES[f.severity]),
             f.region,
-            _console_service(f.service),
-            _console_resource(f.resource_id),
+            f.service,
+            f.resource_id,
             f.title,
         )
     console.print(table)
@@ -67,17 +66,3 @@ def render_console(report: ScanReport, no_color: bool = False, verbose: bool = F
                 f"{error.service} {region_label(error.region)}: {error.message}",
                 style="yellow",
             )
-
-
-def _console_service(service: str) -> str:
-    return SERVICE_LABELS.get(service, service)
-
-
-def _console_resource(resource_id: str) -> str:
-    if ":function:" in resource_id:
-        return "function:" + resource_id.rsplit(":function:", 1)[1]
-    if ":secret:" in resource_id:
-        return "secret:" + resource_id.rsplit(":secret:", 1)[1]
-    if ":loadbalancer/" in resource_id:
-        return resource_id.rsplit(":loadbalancer/", 1)[1]
-    return resource_id
