@@ -54,6 +54,34 @@ class FakeEcs:
         raise AssertionError(operation)
 
 
+class FakeEcsTaskDefinitionFailure(FakeEcs):
+    def call(self, operation: str, **kwargs: object):
+        if operation == "describe_services":
+            return {
+                "services": [
+                    {
+                        "serviceArn": "svc-public",
+                        "serviceName": "svc-public",
+                        "taskDefinition": "td-missing",
+                        "networkConfiguration": {
+                            "awsvpcConfiguration": {"assignPublicIp": "ENABLED"}
+                        },
+                    },
+                    {
+                        "serviceArn": "svc-privileged",
+                        "serviceName": "svc-privileged",
+                        "taskDefinition": "td-shared",
+                        "networkConfiguration": {
+                            "awsvpcConfiguration": {"assignPublicIp": "DISABLED"}
+                        },
+                    },
+                ]
+            }
+        if operation == "describe_task_definition" and kwargs["taskDefinition"] == "td-missing":
+            raise ClientError({"Error": {"Code": "Denied"}}, operation)
+        return super().call(operation, **kwargs)
+
+
 def test_ecs_service_checks_batching_and_cache() -> None:
     fake = FakeEcs()
     result = scan_ecs(fake, "us-east-1")  # type: ignore[arg-type]
@@ -74,4 +102,14 @@ def test_ecs_api_failure() -> None:
     result = scan_ecs(FakeEcs(fail=True), "us-east-1")  # type: ignore[arg-type]
 
     assert result.findings == []
+    assert result.errors
+
+
+def test_ecs_task_definition_failure_does_not_stop_service_scan() -> None:
+    result = scan_ecs(FakeEcsTaskDefinitionFailure(), "us-east-1")  # type: ignore[arg-type]
+
+    assert {f.check_id for f in result.findings} == {
+        "ECS_SERVICE_PUBLIC_IP_ENABLED",
+        "ECS_PRIVILEGED_CONTAINER",
+    }
     assert result.errors
