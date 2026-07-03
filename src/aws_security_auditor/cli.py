@@ -82,18 +82,15 @@ def scan(
     )
     excluded_regions = _csv(exclude_regions)
     selected_services = _services(services)
-    file_required_tags: tuple[str, ...] | None = None
-    critical_resource_tags: dict[str, tuple[str, ...]] | None = None
+    file_config = None
     if config_file:
         try:
-            file_required_tags, critical_resource_tags = load_config_file(config_file)
+            file_config = load_config_file(config_file)
         except ValueError as exc:
             raise typer.BadParameter(str(exc), param_hint="--config") from exc
-    tags = (
-        tuple(t.strip() for t in required_tags.split(",") if t.strip())
-        if required_tags != ",".join(DEFAULT_REQUIRED_TAGS) or file_required_tags is None
-        else file_required_tags
-    )
+    tags = tuple(t.strip() for t in required_tags.split(",") if t.strip())
+    if required_tags == ",".join(DEFAULT_REQUIRED_TAGS) and file_config is not None:
+        tags = file_config.required_tags or tags
     config = ScanConfig(
         profile=profile,
         role_arn=role_arn,
@@ -110,12 +107,17 @@ def scan(
         snapshot_age_days=snapshot_age_days,
         access_key_age_days=access_key_age_days,
         required_tags=tags,
-        critical_resource_tags=critical_resource_tags or ScanConfig().critical_resource_tags,
+        critical_resource_tags=(
+            file_config.critical_resource_tags
+            if file_config
+            else ScanConfig().critical_resource_tags
+        ),
+        suppressions=file_config.suppressions if file_config else (),
         max_workers=max_workers,
     )
     report = run_scan(config)
     if output == "table":
-        render_console(report, no_color=no_color)
+        render_console(report, no_color=no_color, verbose=verbose)
         text = render_markdown(report)
     elif output == "json":
         text = render_json(report)

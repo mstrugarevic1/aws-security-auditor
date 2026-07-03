@@ -32,8 +32,26 @@ def render_markdown(report: ScanReport) -> str:
             f"- HIGH: {counts[Severity.HIGH]}",
             f"- MEDIUM: {counts[Severity.MEDIUM]}",
             f"- LOW: {counts[Severity.LOW]}",
+            f"- Suppressed: {report.summary.suppressed}",
             f"- Errors: {report.summary.errors}",
             f"- Duration: {report.summary.duration_seconds}s",
         ]
     )
+    if report.suppressed_findings:
+        lines.extend(
+            [
+                "",
+                "## Suppressed findings",
+                "",
+                "| Check ID | Region | Resource | Reason | Expires |",
+                "| --- | --- | --- | --- | --- |",
+            ]
+        )
+        for suppressed in report.suppressed_findings:
+            finding = suppressed.finding
+            lines.append(
+                f"| {finding.check_id} | {region_label(finding.region)} | "
+                f"{finding.resource_id} | {suppressed.reason} | "
+                f"{suppressed.expires.isoformat()} |"
+            )
     return "\n".join(lines) + "\n"

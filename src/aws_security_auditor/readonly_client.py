@@ -7,6 +7,7 @@ ALLOWED_OPERATIONS = {
     "sts": {"assume_role", "get_caller_identity"},
     "ec2": {
         "describe_addresses",
+        "describe_flow_logs",
         "describe_images",
         "describe_instances",
         "describe_network_interfaces",
@@ -15,6 +16,7 @@ ALLOWED_OPERATIONS = {
         "describe_security_groups",
         "describe_snapshots",
         "describe_volumes",
+        "describe_vpcs",
         "get_ebs_encryption_by_default",
     },
     "cloudtrail": {"describe_trails", "get_trail_status"},
@@ -48,6 +50,18 @@ ALLOWED_OPERATIONS = {
         "list_user_policies",
         "list_users",
     },
+    "lambda": {
+        "list_functions",
+        "list_function_url_configs",
+    },
+    "ecs": {
+        "describe_services",
+        "describe_task_definition",
+        "list_clusters",
+        "list_services",
+    },
+    "secretsmanager": {"list_secrets"},
+    "accessanalyzer": {"list_analyzers"},
 }
 
 

@@ -8,7 +8,7 @@ from aws_security_auditor.readonly_client import ReadOnlyAwsClient
 
 
 def scan_cloudtrail(cloudtrail: ReadOnlyAwsClient, region: str) -> CheckResult:
-    result = CheckResult(checks=1)
+    result = CheckResult(checks=3)
     try:
         trails = cloudtrail.call("describe_trails", includeShadowTrails=True).get("trailList", [])
         result.resources += len(trails)
@@ -38,9 +38,13 @@ def scan_cloudtrail(cloudtrail: ReadOnlyAwsClient, region: str) -> CheckResult:
                 )
             )
         for trail in trails:
+            home_region = trail.get("HomeRegion")
+            if home_region and home_region != region:
+                continue
             name = trail.get("Name")
             if not name:
                 continue
+            resource_id = str(trail.get("TrailARN") or name)
             status = cloudtrail.call("get_trail_status", Name=name)
             if status.get("IsLogging") is not True:
                 result.findings.append(
@@ -49,9 +53,36 @@ def scan_cloudtrail(cloudtrail: ReadOnlyAwsClient, region: str) -> CheckResult:
                         "CLOUDTRAIL_TRAIL_NOT_LOGGING",
                         "CloudTrail",
                         region,
-                        name,
+                        resource_id,
                         "CloudTrail trail is not logging",
                         "Enable logging for the trail.",
+                    )
+                )
+                continue
+            if trail.get("LogFileValidationEnabled") is not True:
+                result.findings.append(
+                    _finding(
+                        Severity.MEDIUM,
+                        "CLOUDTRAIL_LOG_VALIDATION_DISABLED",
+                        "CloudTrail",
+                        region,
+                        resource_id,
+                        "CloudTrail log-file validation is disabled",
+                        "Enable CloudTrail log-file validation to detect modified "
+                        "or deleted log files.",
+                    )
+                )
+            if not trail.get("KmsKeyId"):
+                result.findings.append(
+                    _finding(
+                        Severity.MEDIUM,
+                        "CLOUDTRAIL_LOGS_NOT_KMS_ENCRYPTED",
+                        "CloudTrail",
+                        region,
+                        resource_id,
+                        "CloudTrail logs are not encrypted with a customer-managed KMS key",
+                        "Configure the trail to encrypt log and digest files with "
+                        "an approved KMS key.",
                     )
                 )
     except (ClientError, BotoCoreError, KeyError, TypeError) as exc:

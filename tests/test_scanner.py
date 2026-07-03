@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+
 from aws_security_auditor.checks.base import CheckResult
-from aws_security_auditor.config import ScanConfig
+from aws_security_auditor.config import ScanConfig, Suppression
 from aws_security_auditor.models import Finding, Severity
 from aws_security_auditor.scanner import run_scan
 
@@ -19,6 +21,12 @@ def test_scanning_continues_after_one_regional_error(monkeypatch) -> None:
     )
     monkeypatch.setattr("aws_security_auditor.scanner.scan_s3", lambda *_args: CheckResult())
     monkeypatch.setattr("aws_security_auditor.scanner.scan_iam", lambda *_args: CheckResult())
+    monkeypatch.setattr("aws_security_auditor.scanner.scan_vpc", lambda *_args: CheckResult())
+    monkeypatch.setattr("aws_security_auditor.scanner.scan_lambda", lambda *_args: CheckResult())
+    monkeypatch.setattr("aws_security_auditor.scanner.scan_ecs", lambda *_args: CheckResult())
+    monkeypatch.setattr(
+        "aws_security_auditor.scanner.scan_secretsmanager", lambda *_args: CheckResult()
+    )
 
     def fake_region(
         session: object, region: str, account_id: str, config: ScanConfig
@@ -74,6 +82,12 @@ def test_exclude_regions_filters_discovered_regions(monkeypatch) -> None:
     )
     monkeypatch.setattr("aws_security_auditor.scanner.scan_s3", lambda *_args: CheckResult())
     monkeypatch.setattr("aws_security_auditor.scanner.scan_iam", lambda *_args: CheckResult())
+    monkeypatch.setattr("aws_security_auditor.scanner.scan_vpc", lambda *_args: CheckResult())
+    monkeypatch.setattr("aws_security_auditor.scanner.scan_lambda", lambda *_args: CheckResult())
+    monkeypatch.setattr("aws_security_auditor.scanner.scan_ecs", lambda *_args: CheckResult())
+    monkeypatch.setattr(
+        "aws_security_auditor.scanner.scan_secretsmanager", lambda *_args: CheckResult()
+    )
     monkeypatch.setattr("aws_security_auditor.scanner._scan_region", lambda *_args: CheckResult())
 
     report = run_scan(ScanConfig(exclude_regions=("us-east-1",), max_workers=1))
@@ -122,6 +136,12 @@ def test_default_scan_skips_account_baseline_checks(monkeypatch) -> None:
     monkeypatch.setattr("aws_security_auditor.scanner.scan_ecr", lambda *_args: CheckResult())
     monkeypatch.setattr("aws_security_auditor.scanner.scan_kms", lambda *_args: CheckResult())
     monkeypatch.setattr("aws_security_auditor.scanner.scan_rds", lambda *_args: CheckResult())
+    monkeypatch.setattr("aws_security_auditor.scanner.scan_vpc", lambda *_args: CheckResult())
+    monkeypatch.setattr("aws_security_auditor.scanner.scan_lambda", lambda *_args: CheckResult())
+    monkeypatch.setattr("aws_security_auditor.scanner.scan_ecs", lambda *_args: CheckResult())
+    monkeypatch.setattr(
+        "aws_security_auditor.scanner.scan_secretsmanager", lambda *_args: CheckResult()
+    )
     monkeypatch.setattr(
         "aws_security_auditor.scanner.scan_regional_tags", lambda *_args: CheckResult()
     )
@@ -141,10 +161,57 @@ def test_default_scan_skips_account_baseline_checks(monkeypatch) -> None:
         "aws_security_auditor.scanner.scan_securityhub",
         lambda *_args: calls.append("securityhub") or CheckResult(),
     )
+    monkeypatch.setattr(
+        "aws_security_auditor.scanner.scan_access_analyzer",
+        lambda *_args: calls.append("accessanalyzer") or CheckResult(),
+    )
 
     run_scan(ScanConfig(max_workers=1))
 
     assert calls == []
+
+
+def test_default_scan_runs_new_default_services(monkeypatch) -> None:
+    calls: list[str] = []
+    monkeypatch.setattr("aws_security_auditor.scanner.build_session", lambda config: object())
+    monkeypatch.setattr(
+        "aws_security_auditor.scanner.client",
+        lambda *_args: type(
+            "C", (), {"call": lambda self, op, **kw: {"Account": "1", "Arn": "arn"}}
+        )(),
+    )
+    monkeypatch.setattr("aws_security_auditor.scanner.discover_regions", lambda *_args: (["a"], []))
+    for name in (
+        "scan_s3",
+        "scan_iam",
+        "scan_ec2",
+        "scan_elbv2",
+        "scan_ecr",
+        "scan_kms",
+        "scan_rds",
+        "scan_regional_tags",
+    ):
+        monkeypatch.setattr(f"aws_security_auditor.scanner.{name}", lambda *_args: CheckResult())
+    monkeypatch.setattr(
+        "aws_security_auditor.scanner.scan_vpc",
+        lambda *_args: calls.append("vpc") or CheckResult(),
+    )
+    monkeypatch.setattr(
+        "aws_security_auditor.scanner.scan_lambda",
+        lambda *_args: calls.append("lambda") or CheckResult(),
+    )
+    monkeypatch.setattr(
+        "aws_security_auditor.scanner.scan_ecs",
+        lambda *_args: calls.append("ecs") or CheckResult(),
+    )
+    monkeypatch.setattr(
+        "aws_security_auditor.scanner.scan_secretsmanager",
+        lambda *_args: calls.append("secretsmanager") or CheckResult(),
+    )
+
+    run_scan(ScanConfig(max_workers=1))
+
+    assert calls == ["vpc", "lambda", "ecs", "secretsmanager"]
 
 
 def test_baseline_checks_run_when_explicitly_selected(monkeypatch) -> None:
@@ -165,7 +232,52 @@ def test_baseline_checks_run_when_explicitly_selected(monkeypatch) -> None:
         "aws_security_auditor.scanner.scan_config",
         lambda *_args: calls.append("config") or CheckResult(),
     )
+    monkeypatch.setattr(
+        "aws_security_auditor.scanner.scan_access_analyzer",
+        lambda *_args: calls.append("accessanalyzer") or CheckResult(),
+    )
 
-    run_scan(ScanConfig(services=("cloudtrail", "config"), max_workers=1))
+    run_scan(ScanConfig(services=("cloudtrail", "config", "accessanalyzer"), max_workers=1))
 
-    assert calls == ["cloudtrail", "config"]
+    assert calls == ["cloudtrail", "accessanalyzer", "config"]
+
+
+def test_suppression_applies_before_severity_filter(monkeypatch) -> None:
+    monkeypatch.setattr("aws_security_auditor.scanner.build_session", lambda config: object())
+    monkeypatch.setattr(
+        "aws_security_auditor.scanner.client",
+        lambda *_args: type(
+            "C", (), {"call": lambda self, op, **kw: {"Account": "123", "Arn": "arn"}}
+        )(),
+    )
+    monkeypatch.setattr("aws_security_auditor.scanner.discover_regions", lambda *_args: (["a"], []))
+    monkeypatch.setattr("aws_security_auditor.scanner.scan_s3", lambda *_args: CheckResult())
+    monkeypatch.setattr("aws_security_auditor.scanner.scan_iam", lambda *_args: CheckResult())
+    monkeypatch.setattr(
+        "aws_security_auditor.scanner._scan_region",
+        lambda *_args: CheckResult(
+            findings=[
+                Finding(Severity.HIGH, "H", "EC2", "a", "r", "High", "", ""),
+                Finding(Severity.MEDIUM, "M", "EC2", "a", "m", "Medium", "", ""),
+            ]
+        ),
+    )
+
+    report = run_scan(
+        ScanConfig(
+            severity="HIGH",
+            suppressions=(
+                Suppression(
+                    "H",
+                    "r",
+                    "accepted",
+                    datetime.now(UTC).date() + timedelta(days=1),
+                ),
+            ),
+            max_workers=1,
+        )
+    )
+
+    assert report.findings == []
+    assert report.summary.suppressed == 1
+    assert report.suppressed_findings[0].finding.check_id == "H"

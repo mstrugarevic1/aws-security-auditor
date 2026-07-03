@@ -1,9 +1,17 @@
 from __future__ import annotations
 
+from datetime import date
+
 from typer.testing import CliRunner
 
 from aws_security_auditor.cli import app
-from aws_security_auditor.models import Finding, ScanReport, ScanSummary, Severity
+from aws_security_auditor.models import (
+    Finding,
+    ScanReport,
+    ScanSummary,
+    Severity,
+    SuppressedFinding,
+)
 
 
 def _report(findings: list[Finding]) -> ScanReport:
@@ -137,3 +145,41 @@ def test_slack_failure_does_not_fail_scan(monkeypatch) -> None:
 
     assert result.exit_code == 0
     assert "Slack notification failed" in result.stderr
+
+
+def test_suppressed_high_does_not_fail_or_notify(monkeypatch) -> None:
+    calls: list[str] = []
+    finding = Finding(Severity.HIGH, "H", "EC2", "us-east-1", "sg-1", "High", "", "")
+    report = ScanReport(
+        "123",
+        "arn",
+        None,
+        None,
+        ["us-east-1"],
+        [],
+        [],
+        ScanSummary(1, 1, 1, 0, 0.1, suppressed=1),
+        [SuppressedFinding(finding, "accepted", date(2099, 1, 1))],
+    )
+    monkeypatch.setattr("aws_security_auditor.cli.run_scan", lambda _config: report)
+    monkeypatch.setattr(
+        "aws_security_auditor.cli.notify_slack",
+        lambda report, webhook_url, threshold: calls.append(webhook_url),
+    )
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "scan",
+            "--fail-on",
+            "HIGH",
+            "--notify-on",
+            "HIGH",
+            "--slack-webhook-url",
+            "https://hooks.slack.test/example",
+            "--no-color",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert calls == []
