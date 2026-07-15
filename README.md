@@ -30,6 +30,33 @@ account reviews.
 
 Requires Python 3.11+.
 
+Releases are published on the
+[Releases page](https://github.com/mstrugarevic1/aws-security-auditor/releases) as a wheel.
+This project is not published on PyPI, so install from a release URL.
+
+With `pipx`, which keeps the tool in its own virtualenv:
+
+```bash
+pipx install https://github.com/mstrugarevic1/aws-security-auditor/releases/download/v0.1.0/aws_security_auditor-0.1.0-py3-none-any.whl
+```
+
+With `pip`, into an existing virtualenv:
+
+```bash
+python -m pip install https://github.com/mstrugarevic1/aws-security-auditor/releases/download/v0.1.0/aws_security_auditor-0.1.0-py3-none-any.whl
+```
+
+Both install the `aws-security-auditor` command and pull `boto3`, `rich`, and `typer` from
+PyPI. Check the install:
+
+```bash
+aws-security-auditor --help
+```
+
+To upgrade, install the wheel URL of a newer tag. With `pipx` use `pipx install --force`.
+
+To install from source instead:
+
 ```bash
 git clone https://github.com/mstrugarevic1/aws-security-auditor.git
 cd aws-security-auditor
@@ -38,253 +65,29 @@ source .venv/bin/activate
 python -m pip install -e .
 ```
 
-For local development:
-
-```bash
-python -m pip install -e ".[dev]"
-```
-
-## Usage
-
-Common examples:
+## Quick start
 
 ```bash
 aws-security-auditor scan --profile audit
 aws-security-auditor scan --profile audit --regions eu-central-1,eu-west-1
 aws-security-auditor scan --profile audit --services ec2,s3,iam
-aws-security-auditor scan --profile audit --services ec2,vpc,lambda,ecs,secretsmanager,rds
-aws-security-auditor scan --profile audit --services cloudtrail,accessanalyzer
-aws-security-auditor scan --profile audit --config examples/aws-security-auditor.toml
-aws-security-auditor scan --profile audit --fail-on HIGH --notify-on HIGH
+aws-security-auditor scan --profile audit --fail-on HIGH
 ```
 
-Options:
+The scan discovers all enabled AWS regions by default and reports findings at `HIGH`, `MEDIUM`,
+and `LOW` severity. Use `--fail-on HIGH` in CI to exit non-zero on high-severity findings.
 
-| Option | Purpose |
+Run `aws-security-auditor scan --help` for the full option list.
+
+## Documentation
+
+| Page | Contents |
 | --- | --- |
-| `--profile PROFILE` | Use a named AWS profile. |
-| `--config PATH` | Load TOML config for required tags and critical-resource tag values. |
-| `--role-arn ROLE_ARN` | Assume a read-only audit role before scanning. |
-| `--external-id EXTERNAL_ID` | Pass an external ID when assuming a role. |
-| `--regions REGION1,REGION2` | Scan only the listed AWS regions. |
-| `--exclude-regions REGION1,REGION2` | Skip the listed AWS regions. |
-| `--services ec2,s3,iam` | Scan only selected services. |
-| `--output table,json,markdown,csv` | Choose the report format. |
-| `--output-file PATH` | Write the report to a file. |
-| `--severity HIGH,MEDIUM,LOW` | Show findings at this severity or higher. |
-| `--fail-on HIGH,MEDIUM,LOW` | Exit with status `1` when this severity or higher is found. |
-| `--no-color` | Disable terminal color. |
-| `--verbose` | Show skipped regions and warnings. |
-| `--snapshot-age-days 90` | Set the old snapshot threshold. |
-| `--access-key-age-days 90` | Set the old access key threshold. |
-| `--required-tags Owner,Environment,CostCenter` | Set required resource tags. |
-| `--max-workers 5` | Set the maximum regional scan worker threads. |
-| `--notify-on HIGH,MEDIUM,LOW` | Send a Slack notification when this severity or higher is found. |
-| `--slack-webhook-url URL` | Send Slack notifications to this incoming webhook URL. |
-
-By default the scanner discovers all enabled AWS regions with `ec2:DescribeRegions`. It scans
-`opt-in-not-required` and `opted-in` regions, and skips `not-opted-in` regions. IAM, STS, and
-S3 bucket enumeration run once as global/account-level checks.
-
-Use `--services` to scan only selected services.
-
-| Service | Default | Scope |
-| --- | --- | --- |
-| `ec2` | Yes | EC2 instances, security groups, EBS volumes, snapshots, AMIs, and Elastic IPs. |
-| `ecs` | Yes | ECS services and current task definitions. Standalone tasks are out of scope. |
-| `ecr` | Yes | ECR repository scan-on-push settings. |
-| `elbv2` | Yes | Application and Network Load Balancers. |
-| `iam` | Yes | Account-level IAM posture. |
-| `kms` | Yes | Customer-managed KMS key rotation. |
-| `lambda` | Yes | Lambda Function URL authentication. |
-| `rds` | Yes | RDS public access, encryption, and backup posture. |
-| `s3` | Yes | S3 bucket public access, encryption, versioning, and logging. |
-| `secretsmanager` | Yes | Customer-managed secret rotation. Secret values are never read. |
-| `tags` | Yes | Required tags on supported resources. |
-| `vpc` | Yes | VPC-level Flow Logs. |
-| `accessanalyzer` | No | IAM Access Analyzer external-access analyzer baseline. |
-| `cloudtrail` | No | Account baseline check for CloudTrail trails. |
-| `config` | No | Account baseline check for AWS Config recorders. |
-| `guardduty` | No | Account baseline check for GuardDuty detectors. |
-| `securityhub` | No | Account baseline check for Security Hub enablement. |
-
-Use `--severity MEDIUM` to show `HIGH` and `MEDIUM` findings. Use `--severity HIGH` to show only
-high-severity findings.
-
-Use `--fail-on HIGH` in CI or scheduled jobs when high-severity findings should fail the run.
-
-Recommended scheduled scan:
-
-```bash
-aws-security-auditor scan \
-  --profile audit \
-  --config examples/aws-security-auditor.toml \
-  --fail-on HIGH \
-  --notify-on HIGH
-```
-
-Selected service scan:
-
-```bash
-aws-security-auditor scan \
-  --profile audit \
-  --services ec2,vpc,lambda,ecs,secretsmanager,rds
-```
-
-Baseline-only scan:
-
-```bash
-aws-security-auditor scan \
-  --profile audit \
-  --services cloudtrail,accessanalyzer
-```
-
-## Slack notifications
-
-Use `--notify-on` with a Slack incoming webhook when scheduled scans should notify a channel.
-The webhook can be passed directly or read from `AWS_SECURITY_AUDITOR_SLACK_WEBHOOK_URL`:
-
-```bash
-export AWS_SECURITY_AUDITOR_SLACK_WEBHOOK_URL="$SLACK_WEBHOOK_URL"
-aws-security-auditor scan --profile audit --notify-on HIGH
-```
-
-`--notify-on HIGH` sends only when `HIGH` findings exist. `MEDIUM` includes `HIGH` and
-`MEDIUM`; `LOW` sends for any finding. Slack delivery failure prints a warning but does not
-change the scan exit code. `--fail-on` still controls CI failure behavior independently.
-
-The webhook URL is never printed by the tool and must use HTTPS.
-
-## Config file
-
-Use a TOML config file when tag names or critical-resource markers differ by environment:
-
-```bash
-aws-security-auditor scan --profile audit --config aws-security-auditor.toml
-```
-
-Example:
-
-```toml
-required_tags = ["Owner", "Environment", "CostCenter"]
-
-[critical_resource_tags]
-Environment = ["prod", "production", "prd"]
-Criticality = ["high", "critical", "tier1"]
-
-[[suppressions]]
-check_id = "EC2_SG_OPEN_SSH"
-resource_id = "sg-0123456789abcdef0"
-region = "eu-central-1"
-account_id = "123456789012"
-reason = "Temporary vendor access"
-expires = "2026-08-01"
-```
-
-See [examples/aws-security-auditor.toml](examples/aws-security-auditor.toml) for a reusable
-starting point.
-
-| Setting | Purpose |
-| --- | --- |
-| `required_tags` | Tags required by the tag governance check. |
-| `critical_resource_tags` | Tag values that raise severity for resilience-sensitive findings such as disabled RDS backups or deletion protection. |
-| `suppressions` | Time-limited exact-match finding suppressions. |
-
-Tags tune severity and context only. Missing tags do not suppress direct security exposure checks.
-
-Suppressions require `check_id`, `resource_id`, `reason`, and `expires`. `region` and
-`account_id` are optional exact-match constraints. Suppressions do not support wildcards,
-regular expressions, service-wide rules, severity-only rules, or permanent suppressions.
-The expiration date is valid through that UTC date. Expired suppressions are logged as warnings
-and stop suppressing findings.
-
-Suppressed findings are removed before severity filtering, Slack notification, and `--fail-on`
-evaluation. They remain auditable in console summary counts, verbose console output, JSON, and
-Markdown. CSV reports include active findings only.
-
-## Hygiene vs baseline checks
-
-The default scan focuses on resource hygiene: public exposure, weak IAM posture, missing
-encryption, missing backups, unused network resources, and required tag coverage.
-
-Account baseline services are available when explicitly selected:
-
-```bash
-aws-security-auditor scan --services cloudtrail,config,guardduty,securityhub,accessanalyzer
-```
-
-CloudTrail, AWS Config, GuardDuty, Security Hub, and IAM Access Analyzer are important account
-setup controls. Their absence is treated as a baseline/setup gap rather than a default resource
-hygiene finding.
-
-Public access, IAM risk, public snapshots, and similar direct risks are evaluated from AWS
-resource configuration whether tags exist or not.
-
-## Authentication
-
-Supported authentication:
-
-- default boto3 credential chain
-- named AWS profile with `--profile`
-- STS AssumeRole with `--role-arn` and optional `--external-id`
-
-Recommended approach: use a dedicated read-only role.
-
-```bash
-aws-security-auditor scan \
-  --role-arn arn:aws:iam::123456789012:role/AwsSecurityAuditorReadOnly
-```
-
-Example trust policy:
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Principal": {"AWS": "arn:aws:iam::111122223333:root"},
-      "Action": "sts:AssumeRole"
-    }
-  ]
-}
-```
-
-The tool does not require administrator permissions. Some checks may be skipped when the role
-lacks access to specific services.
-
-Before scanning it calls `sts:GetCallerIdentity` and displays the account ID, ARN, selected
-profile or assumed role, and region count. It never prints credentials, tokens, or secrets.
-
-## Checks
-
-Severity meanings:
-
-| Severity | Meaning |
-| --- | --- |
-| `HIGH` | Likely security exposure requiring prompt review. |
-| `MEDIUM` | Cost, resilience, or exposure issue worth fixing. |
-| `LOW` | Governance or security posture improvement. |
-
-Implemented checks:
-
-| Area | Checks |
-| --- | --- |
-| EC2 security groups | Public ingress for SSH, RDP, HTTP, HTTPS, database ports, all ports, and other ports; default security groups with public ingress; unused security groups. |
-| EC2 capacity and images | Unused Elastic IPs, unattached or unencrypted EBS volumes, disabled EBS encryption by default, old account-owned EBS snapshots, public account-owned AMIs, public EBS snapshots. |
-| EC2 instances | Public instances whose security groups expose internet ingress; IMDSv2 not required (`EC2_IMDSV2_NOT_REQUIRED`). |
-| VPC | Missing active VPC-level Flow Logs (`VPC_FLOW_LOGS_DISABLED`). |
-| Lambda | Public unauthenticated Function URLs (`LAMBDA_PUBLIC_FUNCTION_URL`). |
-| ECS | Services assigning public IPs (`ECS_SERVICE_PUBLIC_IP_ENABLED`); privileged containers in service task definitions (`ECS_PRIVILEGED_CONTAINER`). |
-| Secrets Manager | Customer-managed secrets without automatic rotation (`SECRETSMANAGER_ROTATION_DISABLED`). |
-| RDS | Public, unencrypted, under-backed-up, deletion-protection-disabled, or production non-Multi-AZ database instances (`RDS_PRODUCTION_NOT_MULTI_AZ`). |
-| S3 | Public ACL/policy, Public Access Block, encryption, versioning, and access logging. |
-| IAM | Root MFA, root access keys, password policy, old or unused access keys, console users without MFA, direct inline user policies, AdministratorAccess exposure. |
-| Load balancing | Internet-facing Application and Network Load Balancers. |
-| ECR | Scan-on-push settings. |
-| KMS | Key rotation for eligible customer-managed keys. |
-| Tags | Missing required tags on EC2 instances, EBS volumes, and RDS instances. |
-| Baseline services | CloudTrail trails, log-file validation and KMS encryption (`CLOUDTRAIL_LOG_VALIDATION_DISABLED`, `CLOUDTRAIL_LOGS_NOT_KMS_ENCRYPTED`); AWS Config recorders; GuardDuty detectors; Security Hub; Access Analyzer external-access analyzers (`ACCESS_ANALYZER_EXTERNAL_ACCESS_DISABLED`) when explicitly selected. |
+| [docs/usage.md](docs/usage.md) | Options, services, regions, severity filtering, Slack notifications. |
+| [docs/checks.md](docs/checks.md) | Every implemented check, severity meanings, hygiene vs baseline scans. |
+| [docs/configuration.md](docs/configuration.md) | TOML config, required tags, suppressions. |
+| [docs/authentication.md](docs/authentication.md) | Credential chain, profiles, AssumeRole, trust policy. |
+| [CHANGELOG.md](CHANGELOG.md) | Release history. |
 
 ## How this differs from AWS native services
 
@@ -315,12 +118,29 @@ or cleanup flag.
 ## Development
 
 ```bash
+python -m pip install -e ".[dev]"
 ruff check .
 mypy src
 pytest
 ```
 
 CI runs those commands without AWS credentials and without integration tests against a real account.
+
+## Releasing
+
+Releases are tagged from `main`. The `release` workflow runs the checks, verifies the tag matches
+`__version__`, builds the sdist and wheel, and creates the GitHub Release.
+
+1. Bump `__version__` in `src/aws_security_auditor/__init__.py`.
+2. Move the `[Unreleased]` entries in `CHANGELOG.md` under the new version with a date.
+3. Commit, then tag and push:
+
+```bash
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+A tag that does not match `__version__` fails the release workflow before anything is published.
 
 ## License
 

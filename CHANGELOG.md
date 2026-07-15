@@ -7,19 +7,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
-### Added
-- `requirements.lock`: pinned transitive dependencies generated with pip-tools
-  (`pip-compile`) for reproducible installs.
-- `pip-audit` job in CI to scan locked dependencies for known vulnerabilities.
-- Release workflow (`.github/workflows/release.yml`) that builds the package
-  and attaches the sdist/wheel to a GitHub Release on version tags (`v*`).
+## [0.1.0] - 2026-07-15
 
-### Changed
-- CI installs dependencies against `requirements.lock` for reproducible runs.
-
-## [0.1.0]
-
-Initial version. Read-only AWS security scanner covering common security, cost,
+Initial release. Read-only AWS security scanner covering common security, cost,
 and governance issues.
 
 ### Added
@@ -29,3 +19,12 @@ and governance issues.
 - Slack notifier for findings.
 - Finding suppressions and TOML configuration.
 - Multi-region scanning.
+- `requirements.lock`: pinned transitive dependencies generated with pip-tools
+  (`pip-compile`) for reproducible installs.
+- `pip-audit` job in CI to scan locked dependencies for known vulnerabilities.
+- Release workflow (`.github/workflows/release.yml`) that runs the checks, builds
+  the package, and attaches the sdist/wheel to a GitHub Release on version tags
+  (`v*`).
+
+[Unreleased]: https://github.com/mstrugarevic1/aws-security-auditor/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/mstrugarevic1/aws-security-auditor/releases/tag/v0.1.0
