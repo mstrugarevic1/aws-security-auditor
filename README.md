@@ -128,11 +128,11 @@ CI runs those commands without AWS credentials and without integration tests aga
 
 ## Releasing
 
-Releases are tagged from `main`. The `release` workflow runs the checks, verifies the tag matches
-`__version__`, takes the release notes from `CHANGELOG.md`, builds the sdist and wheel, and
-creates the GitHub Release.
+Releases are tagged from `main`. The `release` workflow verifies the tag matches the version in
+`pyproject.toml`, builds the sdist and wheel, and creates the GitHub Release with notes generated
+from the commits since the previous tag. The `test` workflow already ran the checks on `main`.
 
-1. Bump `__version__` in `src/aws_security_auditor/__init__.py`.
+1. Bump `version` in `pyproject.toml`.
 2. Move the `[Unreleased]` entries in `CHANGELOG.md` under a `## [0.2.0] - YYYY-MM-DD` heading,
    and update the link definitions at the bottom of the file.
 3. Commit, then tag and push:
@@ -142,9 +142,8 @@ git tag v0.2.0
 git push origin v0.2.0
 ```
 
-The workflow fails before publishing anything if the tag does not match `__version__`, or if
-`CHANGELOG.md` has no section for that version. The text under the version heading becomes the
-release notes verbatim, so write it for someone deciding whether to upgrade.
+A tag that does not match `pyproject.toml` fails the release workflow before anything is published.
+`CHANGELOG.md` is maintained by hand and is not read by the workflow.
 
 ## License
 
