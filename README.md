@@ -1,7 +1,7 @@
 # aws-security-auditor
 
 <p align="center">
-  <img src="docs/assets/logo3.png" alt="AWS Security Auditor logo" width="360">
+  <img src="docs/assets/logo3.png" alt="AWS Security Auditor logo" width="320">
 </p>
 
 <p align="center">
