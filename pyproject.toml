@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aws-security-auditor"
-dynamic = ["version"]
-description = "Read-only AWS security scanner for common security, cost, and governance issues."
+version = "0.1.0"
+description ="Read-only AWS security scanner for common security, cost, and governance issues."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -25,9 +25,6 @@ dev = [
 
 [project.scripts]
 aws-security-auditor = "aws_security_auditor.cli:app"
-
-[tool.setuptools.dynamic]
-version = {attr = "aws_security_auditor.__version__"}
 
 [tool.setuptools.packages.find]
 where = ["src"]

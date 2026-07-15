@@ -36,9 +36,9 @@ jobs:
       - name: Verify tag matches project version
         run: |
           tag_version="${GITHUB_REF_NAME#v}"
-          project_version="$(PYTHONPATH=src python -c 'import aws_security_auditor; print(aws_security_auditor.__version__)')"
+          project_version="$(python -c 'import tomllib, pathlib; print(tomllib.loads(pathlib.Path("pyproject.toml").read_bytes().decode())["project"]["version"])')"
           if [ "$tag_version" != "$project_version" ]; then
-            echo "Tag $GITHUB_REF_NAME does not match __version__ $project_version" >&2
+            echo "Tag $GITHUB_REF_NAME does not match pyproject.toml version $project_version" >&2
             exit 1
           fi
       - name: Extract release notes from CHANGELOG
