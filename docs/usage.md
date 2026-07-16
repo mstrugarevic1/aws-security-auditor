@@ -1,7 +1,16 @@
 # Usage
 
-Full option and service reference. Run `aws-security-auditor scan --help` for the
-authoritative option list generated from the code.
+Full option and service reference. Run `aws-security-auditor --help` or
+`aws-security-auditor scan --help` for the authoritative help generated from the code.
+
+## Commands
+
+| Command | Purpose |
+| --- | --- |
+| `scan` | Run a read-only audit. |
+| `list-checks` | Print implemented check IDs. |
+| `list-services` | Print service names accepted by `--services`. |
+| `--version` | Print the installed package version. |
 
 ## Options
 
@@ -63,6 +72,14 @@ Use `--severity MEDIUM` to show `HIGH` and `MEDIUM` findings. Use `--severity HI
 high-severity findings.
 
 Use `--fail-on HIGH` in CI or scheduled jobs when high-severity findings should fail the run.
+
+## Exit codes
+
+| Code | Meaning |
+| --- | --- |
+| `0` | Scan completed and did not hit the configured `--fail-on` threshold. |
+| `1` | Findings met the configured `--fail-on` threshold. |
+| `2` | CLI usage, profile, region, config, or AWS API setup error prevented a clean scan. |
 
 ## Examples
 

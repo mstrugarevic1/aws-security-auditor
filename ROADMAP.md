@@ -3,7 +3,7 @@
 This roadmap describes direction, not commitments. Items may change, move
 between sections, or be dropped. There are no dates or fixed version numbers.
 
-## Next
+## Completed
 
 - Fix inconsistent behavior when using `--output table` together with `--output-file`.
 - Standardize configuration precedence:
@@ -22,6 +22,10 @@ between sections, or be dropped. There are no dates or fixed version numbers.
   - `list-checks`
   - `list-services`
 - Improve exit codes for CI usage.
+
+## Next
+
+- Keep check coverage focused on common, high-signal AWS posture issues.
 
 ## Later
 

@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from datetime import date
 
+from botocore.exceptions import ClientError, ProfileNotFound
 from typer.testing import CliRunner
 
 from aws_security_auditor.cli import app
+from aws_security_auditor.config import ScanConfig
 from aws_security_auditor.models import (
     Finding,
     ScanReport,
@@ -183,3 +185,159 @@ def test_suppressed_high_does_not_fail_or_notify(monkeypatch) -> None:
 
     assert result.exit_code == 0
     assert calls == []
+
+
+def test_table_output_file_gets_table_text(monkeypatch, tmp_path) -> None:
+    output_file = tmp_path / "report.txt"
+    monkeypatch.setattr("aws_security_auditor.cli.run_scan", lambda _config: _report([]))
+
+    result = CliRunner().invoke(
+        app,
+        ["scan", "--output", "table", "--output-file", str(output_file), "--no-color"],
+    )
+
+    assert result.exit_code == 0
+    assert "Account: 123" in output_file.read_text(encoding="utf-8")
+    assert "# AWS Security Auditor Report" not in output_file.read_text(encoding="utf-8")
+
+
+def test_output_formats(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr("aws_security_auditor.cli.run_scan", lambda _config: _report([]))
+
+    json_result = CliRunner().invoke(app, ["scan", "--output", "json", "--no-color"])
+    markdown_result = CliRunner().invoke(app, ["scan", "--output", "markdown", "--no-color"])
+    csv_result = CliRunner().invoke(app, ["scan", "--output", "csv", "--no-color"])
+
+    assert json_result.exit_code == 0
+    assert '"account_id": "123"' in json_result.stdout
+    assert markdown_result.exit_code == 0
+    assert "# AWS Security Auditor Report" in markdown_result.stdout
+    assert csv_result.exit_code == 0
+    assert "severity,region,service,resource_id,check_id" in csv_result.stdout
+
+
+def test_config_file_precedence(monkeypatch, tmp_path) -> None:
+    seen: list[ScanConfig] = []
+    config_file = tmp_path / "auditor.toml"
+    config_file.write_text(
+        """
+regions = ["eu-west-1"]
+services = ["s3"]
+output = "json"
+severity = "LOW"
+snapshot_age_days = 30
+access_key_age_days = 45
+max_workers = 2
+required_tags = ["Owner"]
+""".strip(),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "aws_security_auditor.cli.run_scan",
+        lambda config: seen.append(config) or _report([]),
+    )
+
+    result = CliRunner().invoke(app, ["scan", "--config", str(config_file), "--no-color"])
+
+    assert result.exit_code == 0
+    assert seen[0].regions == ("eu-west-1",)
+    assert seen[0].services == ("s3",)
+    assert seen[0].output == "json"
+    assert seen[0].severity == "LOW"
+    assert seen[0].snapshot_age_days == 30
+    assert seen[0].access_key_age_days == 45
+    assert seen[0].max_workers == 2
+    assert seen[0].required_tags == ("Owner",)
+
+
+def test_cli_overrides_config_file(monkeypatch, tmp_path) -> None:
+    seen: list[ScanConfig] = []
+    config_file = tmp_path / "auditor.toml"
+    config_file.write_text(
+        """
+regions = ["eu-west-1"]
+services = ["s3"]
+output = "json"
+required_tags = ["Owner"]
+""".strip(),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "aws_security_auditor.cli.run_scan",
+        lambda config: seen.append(config) or _report([]),
+    )
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "scan",
+            "--config",
+            str(config_file),
+            "--regions",
+            "us-east-1",
+            "--services",
+            "ec2",
+            "--output",
+            "csv",
+            "--required-tags",
+            "Service",
+            "--no-color",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert seen[0].regions == ("us-east-1",)
+    assert seen[0].services == ("ec2",)
+    assert seen[0].output == "csv"
+    assert seen[0].required_tags == ("Service",)
+
+
+def test_version_and_list_commands() -> None:
+    runner = CliRunner()
+
+    assert runner.invoke(app, ["--version"]).exit_code == 0
+    checks = runner.invoke(app, ["list-checks"])
+    services = runner.invoke(app, ["list-services"])
+
+    assert checks.exit_code == 0
+    assert "EC2_SG_OPEN_SSH" in checks.stdout
+    assert services.exit_code == 0
+    assert "ec2" in services.stdout
+
+
+def test_operational_errors_exit_2(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "aws_security_auditor.cli.run_scan",
+        lambda _config: (_ for _ in ()).throw(ProfileNotFound(profile="missing")),
+    )
+
+    profile_result = CliRunner().invoke(app, ["scan", "--profile", "missing", "--no-color"])
+
+    assert profile_result.exit_code == 2
+    assert "missing" in profile_result.stderr
+
+
+def test_invalid_region_exits_2(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "aws_security_auditor.cli.run_scan",
+        lambda _config: (_ for _ in ()).throw(ValueError("Invalid region selection")),
+    )
+
+    result = CliRunner().invoke(app, ["scan", "--regions", "antarctica-1", "--no-color"])
+
+    assert result.exit_code == 2
+    assert "Invalid region selection" in result.stderr
+
+
+def test_aws_api_errors_exit_2(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "aws_security_auditor.cli.run_scan",
+        lambda _config: (_ for _ in ()).throw(
+            ClientError({"Error": {"Code": "Denied", "Message": "nope"}}, "DescribeRegions")
+        ),
+    )
+
+    result = CliRunner().invoke(app, ["scan", "--no-color"])
+
+    assert result.exit_code == 2
+    assert "Denied" in result.stderr

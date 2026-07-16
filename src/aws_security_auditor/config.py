@@ -90,6 +90,15 @@ class FileConfig:
     required_tags: tuple[str, ...] | None
     critical_resource_tags: dict[str, tuple[str, ...]]
     suppressions: tuple[Suppression, ...]
+    regions: tuple[str, ...] | None = None
+    exclude_regions: tuple[str, ...] | None = None
+    services: tuple[str, ...] | None = None
+    output: str | None = None
+    severity: str | None = None
+    fail_on: str | None = None
+    snapshot_age_days: int | None = None
+    access_key_age_days: int | None = None
+    max_workers: int | None = None
 
     def __iter__(self) -> Iterator[object]:
         yield self.required_tags
@@ -104,6 +113,15 @@ def load_config_file(path: Path) -> FileConfig:
     required_tags = data.get("required_tags")
     critical_tags = data.get("critical_resource_tags", {})
     suppressions = data.get("suppressions", [])
+    regions = _optional_strings(data, "regions")
+    exclude_regions = _optional_strings(data, "exclude_regions")
+    services = _optional_services(data)
+    output = _optional_choice(data, "output", ("table", "json", "markdown", "csv"))
+    severity = _optional_choice(data, "severity", ("HIGH", "MEDIUM", "LOW"))
+    fail_on = _optional_choice(data, "fail_on", ("HIGH", "MEDIUM", "LOW"))
+    snapshot_age_days = _optional_int(data, "snapshot_age_days")
+    access_key_age_days = _optional_int(data, "access_key_age_days")
+    max_workers = _optional_int(data, "max_workers")
     if required_tags is not None and not _strings(required_tags):
         raise ValueError("required_tags must be a list of strings")
     if not isinstance(critical_tags, dict):
@@ -119,11 +137,63 @@ def load_config_file(path: Path) -> FileConfig:
         tuple(required_tags) if required_tags is not None else None,
         parsed_critical,
         tuple(_parse_suppression(item) for item in suppressions),
+        regions,
+        exclude_regions,
+        services,
+        output,
+        severity,
+        fail_on,
+        snapshot_age_days,
+        access_key_age_days,
+        max_workers,
     )
 
 
 def _strings(value: object) -> bool:
     return isinstance(value, list) and all(isinstance(item, str) for item in value)
+
+
+def _optional_strings(data: dict[str, object], key: str) -> tuple[str, ...] | None:
+    value = data.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise ValueError(f"{key} must be a list of strings")
+    return tuple(value)
+
+
+def _optional_services(data: dict[str, object]) -> tuple[str, ...] | None:
+    services = _optional_strings(data, "services")
+    if services is None:
+        return None
+    services = tuple(service.lower() for service in services)
+    unknown = sorted(set(services) - set(ALL_SERVICES))
+    if unknown:
+        raise ValueError(f"unknown services: {', '.join(unknown)}")
+    return services
+
+
+def _optional_choice(
+    data: dict[str, object], key: str, choices: tuple[str, ...]
+) -> str | None:
+    value = data.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError(f"{key} must be one of: {', '.join(choices)}")
+    normalized = value.lower() if key == "output" else value.upper()
+    if normalized not in choices:
+        raise ValueError(f"{key} must be one of: {', '.join(choices)}")
+    return normalized
+
+
+def _optional_int(data: dict[str, object], key: str) -> int | None:
+    value = data.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, int) or value < 1:
+        raise ValueError(f"{key} must be a positive integer")
+    return value
 
 
 def _parse_suppression(value: object) -> Suppression:

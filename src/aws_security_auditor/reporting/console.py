@@ -13,8 +13,8 @@ from aws_security_auditor.reporting.regions import region_label
 STYLES = {Severity.HIGH: "bold red", Severity.MEDIUM: "bold yellow", Severity.LOW: "bold cyan"}
 
 
-def render_console(report: ScanReport, no_color: bool = False, verbose: bool = False) -> None:
-    console = Console(no_color=no_color or not sys.stdout.isatty(), emoji=False)
+def render_console(report: ScanReport, no_color: bool = False, verbose: bool = False) -> str:
+    console = Console(no_color=no_color or not sys.stdout.isatty(), emoji=False, record=True)
     console.print(f"Account: {report.account_id}")
     console.print(f"ARN: {report.arn}")
     if report.profile:
@@ -66,3 +66,4 @@ def render_console(report: ScanReport, no_color: bool = False, verbose: bool = F
                 f"{error.service} {region_label(error.region)}: {error.message}",
                 style="yellow",
             )
+    return console.export_text()

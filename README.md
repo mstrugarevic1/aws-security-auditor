@@ -37,13 +37,13 @@ This project is not published on PyPI, so install from a release URL.
 With `pipx`, which keeps the tool in its own virtualenv:
 
 ```bash
-pipx install https://github.com/mstrugarevic1/aws-security-auditor/releases/download/v0.1.0/aws_security_auditor-0.1.0-py3-none-any.whl
+pipx install https://github.com/mstrugarevic1/aws-security-auditor/releases/download/v0.2.0/aws_security_auditor-0.2.0-py3-none-any.whl
 ```
 
 With `pip`, into an existing virtualenv:
 
 ```bash
-python -m pip install https://github.com/mstrugarevic1/aws-security-auditor/releases/download/v0.1.0/aws_security_auditor-0.1.0-py3-none-any.whl
+python -m pip install https://github.com/mstrugarevic1/aws-security-auditor/releases/download/v0.2.0/aws_security_auditor-0.2.0-py3-none-any.whl
 ```
 
 Both install the `aws-security-auditor` command and pull `boto3`, `rich`, and `typer` from

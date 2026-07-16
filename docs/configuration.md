@@ -1,6 +1,6 @@
 # Configuration
 
-Use a TOML config file when tag names or critical-resource markers differ by environment:
+Use a TOML config file for repeatable scan defaults:
 
 ```bash
 aws-security-auditor scan --profile audit --config aws-security-auditor.toml
@@ -10,6 +10,14 @@ Example:
 
 ```toml
 required_tags = ["Owner", "Environment", "CostCenter"]
+regions = ["eu-central-1", "eu-west-1"]
+services = ["ec2", "s3", "iam"]
+output = "json"
+severity = "MEDIUM"
+fail_on = "HIGH"
+snapshot_age_days = 90
+access_key_age_days = 90
+max_workers = 5
 
 [critical_resource_tags]
 Environment = ["prod", "production", "prd"]
@@ -29,9 +37,20 @@ starting point.
 
 | Setting | Purpose |
 | --- | --- |
+| `regions` | Regions to scan. CLI `--regions` overrides this. |
+| `exclude_regions` | Regions to skip. CLI `--exclude-regions` overrides this. |
+| `services` | Services to scan. CLI `--services` overrides this. |
+| `output` | `table`, `json`, `markdown`, or `csv`. CLI `--output` overrides this. |
+| `severity` | Minimum reported severity. CLI `--severity` overrides this. |
+| `fail_on` | Severity threshold for exit code `1`. CLI `--fail-on` overrides this. |
+| `snapshot_age_days` | Old EBS snapshot threshold. |
+| `access_key_age_days` | Old IAM access key threshold. |
+| `max_workers` | Maximum regional scan worker threads. |
 | `required_tags` | Tags required by the tag governance check. |
 | `critical_resource_tags` | Tag values that raise severity for resilience-sensitive findings such as disabled RDS backups or deletion protection. |
 | `suppressions` | Time-limited exact-match finding suppressions. |
+
+Precedence is: CLI arguments, then config file, then application defaults.
 
 Tags tune severity and context only. Missing tags do not suppress direct security exposure checks.
 
