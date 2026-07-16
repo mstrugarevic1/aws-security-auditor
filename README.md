@@ -37,13 +37,13 @@ This project is not published on PyPI, so install from a release URL.
 With `pipx`, which keeps the tool in its own virtualenv:
 
 ```bash
-pipx install https://github.com/mstrugarevic1/aws-security-auditor/releases/download/v0.2.0/aws_security_auditor-0.2.0-py3-none-any.whl
+pipx install https://github.com/mstrugarevic1/aws-security-auditor/releases/download/vX.Y.Z/aws_security_auditor-X.Y.Z-py3-none-any.whl
 ```
 
 With `pip`, into an existing virtualenv:
 
 ```bash
-python -m pip install https://github.com/mstrugarevic1/aws-security-auditor/releases/download/v0.2.0/aws_security_auditor-0.2.0-py3-none-any.whl
+python -m pip install https://github.com/mstrugarevic1/aws-security-auditor/releases/download/vX.Y.Z/aws_security_auditor-X.Y.Z-py3-none-any.whl
 ```
 
 Both install the `aws-security-auditor` command and pull `boto3`, `rich`, and `typer` from
@@ -69,6 +69,7 @@ python -m pip install -e .
 
 ```bash
 aws-security-auditor scan --profile audit
+aws-security-auditor scan --profile audit --config examples/aws-security-auditor.toml
 aws-security-auditor scan --profile audit --regions eu-central-1,eu-west-1
 aws-security-auditor scan --profile audit --services ec2,s3,iam
 aws-security-auditor scan --profile audit --fail-on HIGH
@@ -81,21 +82,17 @@ Run `aws-security-auditor scan --help` for the full option list.
 
 ## Documentation
 
-| Page | Contents |
-| --- | --- |
-| [docs/usage.md](docs/usage.md) | Options, services, regions, severity filtering, Slack notifications. |
-| [docs/checks.md](docs/checks.md) | Every implemented check, severity meanings, hygiene vs baseline scans. |
-| [docs/configuration.md](docs/configuration.md) | TOML config, required tags, suppressions. |
-| [docs/authentication.md](docs/authentication.md) | Credential chain, profiles, AssumeRole, trust policy. |
-| [CHANGELOG.md](CHANGELOG.md) | Release history. |
+- [Usage](docs/usage.md): options, services, regions, severity filtering, Slack notifications.
+- [Checks](docs/checks.md): implemented checks, severity meanings, hygiene vs baseline scans.
+- [Configuration](docs/configuration.md): TOML config defaults, required tags, suppressions.
+- [Authentication](docs/authentication.md): credential chain, profiles, AssumeRole, trust policy.
+- [Changelog](CHANGELOG.md): release history.
 
 ## How this differs from AWS native services
 
-CloudTrail records AWS API activity. AWS Config records resource configuration history. Security
-Hub aggregates posture findings across accounts and services.
-
-`aws-security-auditor` is different: it gives a fast read-only snapshot without requiring those
-managed services to be enabled first.
+AWS native services such as CloudTrail, AWS Config, Security Hub, and Trusted Advisor are still the
+right long-term controls. `aws-security-auditor` gives a fast read-only snapshot without requiring
+those services to be enabled first.
 
 ## Safety
 
@@ -118,7 +115,7 @@ or cleanup flag.
 ## Development
 
 ```bash
-python -m pip install -e ".[dev]"
+python -m pip install -e ".[dev]" -c requirements-dev.lock
 ruff check .
 mypy src
 pytest
@@ -132,22 +129,7 @@ See [ROADMAP.md](ROADMAP.md) for planned and proposed improvements.
 
 ## Releasing
 
-Releases are tagged from `main`. The `release` workflow verifies the tag matches the version in
-`pyproject.toml`, builds the sdist and wheel, and creates the GitHub Release with notes generated
-from the commits since the previous tag. The `test` workflow already ran the checks on `main`.
-
-1. Bump `version` in `pyproject.toml`.
-2. Move the `[Unreleased]` entries in `CHANGELOG.md` under a `## [0.2.0] - YYYY-MM-DD` heading,
-   and update the link definitions at the bottom of the file.
-3. Commit, then tag and push:
-
-```bash
-git tag v0.2.0
-git push origin v0.2.0
-```
-
-A tag that does not match `pyproject.toml` fails the release workflow before anything is published.
-`CHANGELOG.md` is maintained by hand and is not read by the workflow.
+See [docs/releasing.md](docs/releasing.md).
 
 ## License
 
