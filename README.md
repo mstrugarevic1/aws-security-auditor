@@ -126,6 +126,10 @@ pytest
 
 CI runs those commands without AWS credentials and without integration tests against a real account.
 
+## Roadmap
+
+See [ROADMAP.md](ROADMAP.md) for planned and proposed improvements.
+
 ## Releasing
 
 Releases are tagged from `main`. The `release` workflow verifies the tag matches the version in
